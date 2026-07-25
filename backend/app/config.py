@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     APP_URL: str = "http://localhost:8000"
 
     # CORS
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    CORS_ORIGINS: str = "https://intern-app-pink.vercel.app,https://intern-app-lxil.onrender.com"
 
     # Evolution API (WhatsApp)
     EVOLUTION_API_URL: str = "http://localhost:8085"

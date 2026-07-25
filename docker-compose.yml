@@ -19,7 +19,7 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql://postgres:12345@db:5432/internship_ats
-      CORS_ORIGINS: http://localhost:80,http://localhost:5173
+      CORS_ORIGINS: https://intern-app-pink.vercel.app,https://intern-app-lxil.onrender.com
     depends_on:
       db:
         condition: service_healthy
