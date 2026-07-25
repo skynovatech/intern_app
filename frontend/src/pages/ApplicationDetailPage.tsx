@@ -615,7 +615,7 @@ export function ApplicationDetailPage() {
             {emailTemplates.filter((t) => t.is_active).length > 0 && (
               <div className="space-y-2">
                 <Label>Use Template</Label>
-                <Select onValueChange={(v) => { const t = emailTemplates.find((t) => t.id === Number(v)); if (t) setEmailForm({ subject: t.subject, message: t.body }); }}>
+                <Select onValueChange={(v) => { const t = emailTemplates.find((t) => t.id === Number(v)); if (t) setEmailForm((prev) => ({ ...prev, subject: t.subject, message: t.body })); }}>
                   <SelectTrigger><SelectValue placeholder="Select a template..." /></SelectTrigger>
                   <SelectContent>{emailTemplates.filter((t) => t.is_active).map((tpl) => <SelectItem key={tpl.id} value={String(tpl.id)}>{tpl.name}</SelectItem>)}</SelectContent>
                 </Select>
