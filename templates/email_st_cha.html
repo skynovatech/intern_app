@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Application Status Update</title>
+</head>
+
+<body style="margin:0;padding:40px 15px;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#374151;">
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+<tr>
+<td align="center">
+
+<table role="presentation"
+       width="640"
+       cellspacing="0"
+       cellpadding="0"
+       style="max-width:640px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+
+    <!-- Top Accent -->
+    <tr>
+        <td style="height:6px;background:#2563eb;"></td>
+    </tr>
+
+    <!-- Header -->
+    <tr>
+        <td style="padding:42px 48px 18px;">
+
+            <div style="font-size:13px;font-weight:600;color:#2563eb;letter-spacing:1px;text-transform:uppercase;">
+                Recruitment Update
+            </div>
+
+            <h1 style="margin:10px 0 0;font-size:30px;font-weight:700;color:#111827;">
+                Application Status Updated
+            </h1>
+
+            <p style="margin:12px 0 0;font-size:16px;line-height:28px;color:#6b7280;">
+                We've reviewed your application and there has been an update to your recruitment progress.
+            </p>
+
+        </td>
+    </tr>
+
+    <!-- Divider -->
+    <tr>
+        <td style="padding:0 48px;">
+            <hr style="border:none;border-top:1px solid #e5e7eb;">
+        </td>
+    </tr>
+
+    <!-- Greeting -->
+    <tr>
+        <td style="padding:38px 48px 10px;">
+
+            <p style="margin:0;font-size:17px;color:#111827;">
+                Dear <strong>{applicant_name}</strong>,
+            </p>
+
+            <p style="margin:20px 0 0;font-size:15px;line-height:28px;color:#4b5563;">
+                Thank you for your interest in joining
+                <strong>{company_name}</strong>.
+                We appreciate the time and effort you invested throughout the recruitment process.
+            </p>
+
+            <p style="margin:18px 0 0;font-size:15px;line-height:28px;color:#4b5563;">
+                We would like to inform you that the status of your application has been updated.
+                Please find the latest details below.
+            </p>
+
+        </td>
+    </tr>
+
+    <!-- Status Card -->
+    <tr>
+        <td style="padding:28px 48px;">
+
+            <table width="100%"
+                   cellspacing="0"
+                   cellpadding="0"
+                   style="border:1px solid #e5e7eb;border-radius:12px;background:#fafafa;">
+
+                <tr>
+
+                    <td style="padding:28px;">
+
+                        <table width="100%" cellpadding="8">
+
+                            <tr>
+
+                                <td width="45%" style="font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;">
+                                    Previous Status
+                                </td>
+
+                                <td style="font-size:15px;color:#374151;">
+                                    {old_status}
+                                </td>
+
+                            </tr>
+
+                            <tr>
+
+                                <td style="font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;">
+                                    Current Status
+                                </td>
+
+                                <td style="font-size:18px;font-weight:700;color:#2563eb;">
+                                    {new_status}
+                                </td>
+
+                            </tr>
+
+                        </table>
+
+                    </td>
+
+                </tr>
+
+            </table>
+
+        </td>
+    </tr>
+
+    <!-- Notes -->
+    <tr>
+        <td style="padding:0 48px;">
+
+            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:24px;">
+
+                <div style="font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;">
+                    Recruiter's Notes
+                </div>
+
+                <div style="font-size:15px;line-height:28px;color:#4b5563;">
+                    {notes_section}
+                </div>
+
+            </div>
+
+        </td>
+    </tr>
+
+    <!-- Next Steps -->
+    <tr>
+        <td style="padding:36px 48px 10px;">
+
+            <h3 style="margin:0;font-size:18px;color:#111827;">
+                What happens next?
+            </h3>
+
+            <p style="margin:15px 0 0;font-size:15px;line-height:28px;color:#4b5563;">
+                If additional information or action is required from you,
+                our recruitment team will contact you with the necessary instructions.
+                Otherwise, we kindly ask you to await further communication regarding the next stage of the hiring process.
+            </p>
+
+        </td>
+    </tr>
+
+    <!-- Contact -->
+    <tr>
+        <td style="padding:28px 48px 42px;">
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #dbeafe;border-radius:10px;">
+
+                <tr>
+                    <td style="padding:22px;">
+
+                        <strong style="font-size:15px;color:#1e40af;">
+                            Need assistance?
+                        </strong>
+
+                        <p style="margin:10px 0 0;font-size:14px;line-height:26px;color:#475569;">
+                            If you have any questions regarding your application,
+                            please reply to this email or contact our recruitment team.
+                            We are happy to assist you.
+                        </p>
+
+                    </td>
+                </tr>
+
+            </table>
+
+        </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+        <td style="padding:32px 48px;background:#fafafa;border-top:1px solid #e5e7eb;">
+
+            <p style="margin:0;font-size:15px;color:#111827;">
+                Best regards,
+            </p>
+
+            <p style="margin:8px 0 0;font-size:18px;font-weight:700;color:#111827;">
+                {company_name} Recruitment Team
+            </p>
+
+            <p style="margin:22px 0 0;font-size:13px;color:#9ca3af;line-height:22px;">
+                This is an automated notification from the recruitment system.
+                Please do not reply unless instructed. If you believe you received
+                this message in error, kindly disregard it.
+            </p>
+
+        </td>
+    </tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>
