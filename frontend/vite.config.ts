@@ -12,8 +12,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://localhost:8000",
-      "/uploads": "http://localhost:8000",
+      "/api": "https://intern-app-lxil.onrender.com",
+      "/uploads": "https://intern-app-lxil.onrender.com",
     },
   },
 });
