@@ -2,7 +2,7 @@ import axios from "axios";
 import type { TokenResponse } from "@/types";
 
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: "https://intern-app-lxil.onrender.com/api",
   headers: { "Content-Type": "application/json" },
 });
 
@@ -69,7 +69,7 @@ api.interceptors.response.use(
       }
 
       try {
-        const res = await axios.post<TokenResponse>("/api/auth/refresh", {
+        const res = await axios.post<TokenResponse>("/auth/refresh", {
           refresh_token: refreshToken,
         });
 
