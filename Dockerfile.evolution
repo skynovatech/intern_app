@@ -1,0 +1,3 @@
+FROM atendiamo/evolution-api:latest
+WORKDIR /evolution
+ENTRYPOINT ["/bin/bash", "-c", "npx prisma db push --accept-data-loss && npm run start:prod"]

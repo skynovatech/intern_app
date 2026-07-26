@@ -19,6 +19,7 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql://postgres:12345@db:5432/internship_ats
+      EVOLUTION_API_URL: http://evolution-api:8085
       CORS_ORIGINS: https://intern-app-pink.vercel.app,https://intern-app-lxil.onrender.com
     depends_on:
       db:
@@ -35,6 +36,34 @@ services:
     depends_on:
       - backend
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  evolution-api:
+    image: atendiamo/evolution-api:latest
+    ports:
+      - "8085:8085"
+    environment:
+      DATABASE_ENABLED: "true"
+      DATABASE_CONNECTION_URI: postgresql://postgres:12345@db:5432/evolution
+      DATABASE_PROVIDER: postgresql
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379
+      AUTHENTICATION_API_KEY: D65A862AD2DD-419C-A1DC-40F007D4B745
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
 volumes:
   pgdata:
   uploads:
+  redisdata:
+  evolution_instances:
