@@ -159,6 +159,10 @@ export const DOMAIN_OPTIONS = [
   "Full Stack Development",
   "Backend Development",
   "Frontend Development",
+  "Digital Marketing",
+  "Social Media Marketing",
+  "Graphic Design",
+  "Video Editing",
   "Other",
 ];
 
