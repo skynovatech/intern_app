@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "Skynova Tech Solutions"
     SMTP_USE_SSL: bool = False
 
+    BREVO_API_KEY: str = ""
+
     # Company
     COMPANY_NAME: str = "Skynova Tech Solutions"
 

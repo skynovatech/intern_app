@@ -1,9 +1,6 @@
-import smtplib
 import logging
 import time
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.application import MIMEApplication
+import httpx
 from typing import Optional
 from app.config import get_settings
 
@@ -21,68 +18,63 @@ def send_email(
     html: bool = False,
     attachments: Optional[list[tuple[str, bytes, str]]] = None,
 ) -> bool:
-    if not settings.SMTP_USERNAME or not settings.SMTP_PASSWORD:
-        logger.warning("SMTP not configured — skipping email send")
+    if not settings.BREVO_API_KEY:
+        logger.warning("BREVO_API_KEY not configured — skipping email send")
         return False
 
     last_error = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            if attachments:
-                msg = MIMEMultipart("mixed")
-                msg_alternative = MIMEMultipart("alternative")
-                msg.attach(msg_alternative)
-            else:
-                msg = MIMEMultipart("alternative")
-            msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME}>"
-            msg["To"] = to_email
-            msg["Subject"] = subject
+            payload: dict = {
+                "sender": {
+                    "name": settings.SMTP_FROM_NAME,
+                    "email": settings.SMTP_FROM_EMAIL,
+                },
+                "to": [{"email": to_email}],
+                "subject": subject,
+            }
 
             if html:
-                part = MIMEText(body, "html", "utf-8")
+                payload["htmlContent"] = body
             else:
-                part = MIMEText(body, "plain", "utf-8")
-            if attachments:
-                msg_alternative.attach(part)
-            else:
-                msg.attach(part)
+                payload["textContent"] = body
 
             if attachments:
-                for filename, data, mime_subtype in attachments:
-                    attached = MIMEApplication(data, _subtype=mime_subtype)
-                    attached.add_header("Content-Disposition", "attachment", filename=filename)
-                    msg.attach(attached)
+                payload["attachment"] = []
+                for filename, data, _mime_subtype in attachments:
+                    import base64
+                    payload["attachment"].append({
+                        "name": filename,
+                        "content": base64.b64encode(data).decode("utf-8"),
+                    })
 
-            if settings.SMTP_USE_SSL:
-                server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30)
+            with httpx.Client(timeout=30.0) as client:
+                response = client.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    json=payload,
+                    headers={
+                        "api-key": settings.BREVO_API_KEY,
+                        "Content-Type": "application/json",
+                    },
+                )
+
+            if response.status_code in (200, 201):
+                if attempt > 1:
+                    logger.info(f"Email sent to {to_email} on retry attempt {attempt}")
+                else:
+                    logger.info(f"Email sent to {to_email}: {subject}")
+                return True
             else:
-                server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30)
-                server.starttls()
+                last_error = f"HTTP {response.status_code}: {response.text}"
+                logger.warning(f"Brevo API attempt {attempt}/{MAX_RETRIES} failed for {to_email}: {last_error}")
+                if attempt < MAX_RETRIES:
+                    time.sleep(RETRY_DELAY_SECONDS * attempt)
 
-            server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-            server.sendmail(
-                settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME,
-                to_email,
-                msg.as_string(),
-            )
-            server.quit()
-
-            if attempt > 1:
-                logger.info(f"Email sent to {to_email} on retry attempt {attempt}")
-            else:
-                logger.info(f"Email sent to {to_email}: {subject}")
-            return True
-
-        except smtplib.SMTPAuthenticationError:
-            logger.error("SMTP authentication failed — check SMTP_USERNAME and SMTP_PASSWORD")
-            return False
-
-        except (smtplib.SMTPException, TimeoutError, OSError) as e:
+        except httpx.TimeoutException as e:
             last_error = e
-            logger.warning(f"SMTP attempt {attempt}/{MAX_RETRIES} failed for {to_email}: {e}")
+            logger.warning(f"Brevo API timeout attempt {attempt}/{MAX_RETRIES} for {to_email}")
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY_SECONDS * attempt)
-
         except Exception as e:
             last_error = e
             logger.error(f"Failed to send email to {to_email}: {e}")
