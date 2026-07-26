@@ -4,7 +4,7 @@
 
 # Skynova Tech Solutions — Internship Applicant Tracking System
 
-A full-stack recruitment portal for managing internship applications. Built with React/TypeScript and Python/FastAPI, featuring a public multi-step application form, admin HR dashboard, email notifications (Zoho SMTP), and WhatsApp messaging (Evolution API).
+A full-stack recruitment portal for managing internship applications. Built with React/TypeScript and Python/FastAPI, featuring a public multi-step application form, admin HR dashboard, email notifications (Brevo SMTP), and WhatsApp messaging (Evolution API).
 
 ---
 
@@ -21,6 +21,7 @@ A full-stack recruitment portal for managing internship applications. Built with
 - **Application management** — Table with search, sort, filter, pagination, CSV export
 - **Application detail** — Full profile view, photo, resume preview, status timeline, interviews
 - **Analytics** — Domain/gender/college distribution, daily trend, funnel chart
+- **Internship domains** — Web Development, Mobile Development, Data Science, AI/ML, Cloud, Cybersecurity, DevOps, UI/UX, Digital Marketing, Social Media Marketing, Graphic Design, Video Editing, and more
 - **Status workflow** — Pending → Reviewed → Shortlisted → Interview → Selected/Rejected
 - **Email templates** — Create/edit/toggle reusable email templates
 - **WhatsApp templates** — Create/edit/toggle reusable WhatsApp templates
@@ -44,7 +45,7 @@ A full-stack recruitment portal for managing internship applications. Built with
 |---|---|
 | Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS v4, shadcn/ui, Zustand, React Hook Form, Zod, Recharts |
 | Backend | Python 3.11+, FastAPI, SQLAlchemy 2, Alembic, Pydantic v2 |
-| Database | PostgreSQL 15 (Docker) |
+| Database | PostgreSQL 16 (Docker) |
 | WhatsApp | Evolution API (self-hosted via Docker) |
 | Email | Zoho SMTP (smtplib) |
 | Auth | JWT (python-jose) + bcrypt |
@@ -91,7 +92,8 @@ intern_app/
 │   │   └── lib/                 # API client, utilities
 │   ├── package.json
 │   └── vite.config.ts
-└── docker-compose.yml           # Evolution API + Redis
+├── docker-compose.yml           # PostgreSQL + Backend + Frontend + Redis + Evolution API
+└── Dockerfile.evolution         # Render Dockerfile for Evolution API deploy
 ```
 
 ---
@@ -115,39 +117,27 @@ git clone <repo-url>
 cd intern_app
 ```
 
-### 2. Database (PostgreSQL via Docker)
-
-Start PostgreSQL:
-
-```bash
-docker run -d \
-  --name ats-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=12345 \
-  -e POSTGRES_DB=internship_ats \
-  -p 5432:5432 \
-  postgres:15-alpine
-```
-
-Create a second database for Evolution API:
-
-```bash
-docker exec ats-postgres psql -U postgres -c "CREATE DATABASE evolution;"
-```
-
-### 3. WhatsApp (Evolution API via Docker)
+### 2. Start all services (PostgreSQL + Redis + Evolution API)
 
 ```bash
 docker-compose up -d
 ```
 
 This starts:
+- **PostgreSQL** on port `5432`
 - **Redis** on port `6379`
 - **Evolution API** on port `8085`
+- **Backend** on port `8000`
+- **Frontend** on port `80`
 
-Wait ~30 seconds for Evolution API to initialize, then proceed.
+### 3. Apply database migrations
 
-### 4. Backend
+```bash
+cd backend
+alembic upgrade head
+```
+
+### 4. Backend (for local development)
 
 ```bash
 cd backend
@@ -196,23 +186,23 @@ All backend configuration is in `backend/.env`:
 | `ADMIN_EMAIL` | Default admin email | `admin@company.com` |
 | `ADMIN_PASSWORD` | Default admin password | `admin123` |
 | `UPLOAD_DIR` | File upload directory | `uploads` |
-| `SMTP_HOST` | SMTP server | `smtp.zoho.com` |
-| `SMTP_PORT` | SMTP port | `465` |
-| `SMTP_USERNAME` | SMTP login email | Your Zoho email |
-| `SMTP_PASSWORD` | SMTP app password | Your Zoho app password |
-| `SMTP_FROM_EMAIL` | Sender email | Same as username |
+| `SMTP_HOST` | SMTP server | `smtp-relay.brevo.com` |
+| `SMTP_PORT` | SMTP port | `587` |
+| `SMTP_USERNAME` | SMTP login email | Brevo SMTP login |
+| `SMTP_PASSWORD` | SMTP password | Brevo SMTP password |
+| `SMTP_FROM_EMAIL` | Sender email | `hr@skynovatech.in` |
 | `SMTP_FROM_NAME` | Sender display name | `Skynova Tech Solutions` |
-| `SMTP_USE_SSL` | Use SSL | `true` |
+| `SMTP_USE_SSL` | Use SSL | `false` |
+| `BREVO_API_KEY` | Brevo API key (optional) | Your Brevo API key |
 | `EVOLUTION_API_URL` | Evolution API base URL | `http://localhost:8085` |
-| `EVOLUTION_API_KEY` | Evolution API auth key | From `docker-compose.yml` |
+| `EVOLUTION_API_KEY` | Evolution API auth key | `D65A862AD2DD-419C-A1DC-40F007D4B745` |
 | `EVOLUTION_INSTANCE_NAME` | WhatsApp instance name | `ats-whatsapp` |
 
-### Zoho SMTP Setup
+### Brevo SMTP Setup
 
-1. Enable **Two-Factor Authentication** in your Zoho account
-2. Go to **Settings → Security → App Passwords**
-3. Generate an app password for "Custom" app
-4. Use that password (not your account password) in `SMTP_PASSWORD`
+1. Sign up at [Brevo](https://www.brevo.com)
+2. Go to **SMTP & API → SMTP** to find your SMTP credentials
+3. Use the SMTP login and password in `SMTP_USERNAME` and `SMTP_PASSWORD`
 
 ---
 
@@ -332,7 +322,9 @@ cd frontend && npm run build
 
 | Service | Port | Purpose |
 |---|---|---|
-| PostgreSQL | 5432 | Main database + Evolution API database |
+| PostgreSQL | 5432 | Application + Evolution API database |
+| Backend | 8000 | FastAPI application |
+| Frontend | 80 | React frontend (via nginx) |
 | Redis | 6379 | Evolution API cache |
 | Evolution API | 8085 | WhatsApp messaging |
 
