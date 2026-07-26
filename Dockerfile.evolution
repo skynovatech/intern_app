@@ -1,3 +1,4 @@
-FROM atendiamo/evolution-api:latest
+FROM evoapicloud/evolution-api:v2.3.7
 WORKDIR /evolution
-ENTRYPOINT ["/bin/bash", "-c", "npx prisma db push --accept-data-loss && npm run start:prod"]
+RUN chmod +x ./Docker/scripts/* 2>/dev/null || true
+ENTRYPOINT ["/bin/bash", "-c", ". ./Docker/scripts/deploy_database.sh 2>&1 && npm run start:prod"]
