@@ -632,7 +632,7 @@ def whatsapp_create_instance(
     try:
         with httpx.Client(timeout=30.0) as client:
             response = client.post(
-                f"{settings.EVOLUTION_API_URL}/instance/createInstance",
+                f"{settings.EVOLUTION_API_URL.rstrip('/')}/instance/createInstance",
                 json=payload,
                 headers=headers,
             )

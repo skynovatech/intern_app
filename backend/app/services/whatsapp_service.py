@@ -10,6 +10,10 @@ MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 2
 
 
+def _api_url() -> str:
+    return settings.EVOLUTION_API_URL.rstrip("/")
+
+
 def get_evolution_headers() -> dict:
     headers = {"Content-Type": "application/json"}
     if settings.EVOLUTION_API_KEY:
@@ -33,7 +37,7 @@ def check_connection() -> dict:
     try:
         with httpx.Client(timeout=10.0) as client:
             server_resp = client.get(
-                f"{settings.EVOLUTION_API_URL}/manager",
+                f"{_api_url()}/manager",
                 headers=get_evolution_headers(),
             )
             result["server"] = server_resp.status_code == 200
@@ -42,7 +46,7 @@ def check_connection() -> dict:
                 return result
 
             instance_resp = client.get(
-                f"{settings.EVOLUTION_API_URL}/instance/connectionState/{settings.EVOLUTION_INSTANCE_NAME}",
+                f"{_api_url()}/instance/connectionState/{settings.EVOLUTION_INSTANCE_NAME}",
                 headers=get_evolution_headers(),
             )
 
@@ -70,7 +74,7 @@ def get_qr_code() -> dict | None:
     try:
         with httpx.Client(timeout=30.0) as client:
             response = client.get(
-                f"{settings.EVOLUTION_API_URL}/instance/connect/{settings.EVOLUTION_INSTANCE_NAME}",
+                f"{_api_url()}/instance/connect/{settings.EVOLUTION_INSTANCE_NAME}",
                 headers=get_evolution_headers(),
             )
 
@@ -98,7 +102,7 @@ def send_whatsapp_message(
         return False
 
     clean_phone = _clean_phone(to_phone)
-    url = f"{settings.EVOLUTION_API_URL}/message/sendText/{settings.EVOLUTION_INSTANCE_NAME}"
+    url = f"{_api_url()}/message/sendText/{settings.EVOLUTION_INSTANCE_NAME}"
     payload = {
         "number": clean_phone,
         "text": message,
@@ -152,7 +156,7 @@ def send_whatsapp_media(
         return False
 
     clean_phone = _clean_phone(to_phone)
-    url = f"{settings.EVOLUTION_API_URL}/message/sendMedia/{settings.EVOLUTION_INSTANCE_NAME}"
+    url = f"{_api_url()}/message/sendMedia/{settings.EVOLUTION_INSTANCE_NAME}"
     payload = {
         "number": clean_phone,
         "mediatype": "document",
@@ -203,7 +207,7 @@ def logout_instance() -> bool:
     try:
         with httpx.Client(timeout=15.0) as client:
             response = client.delete(
-                f"{settings.EVOLUTION_API_URL}/instance/logout/{settings.EVOLUTION_INSTANCE_NAME}",
+                f"{_api_url()}/instance/logout/{settings.EVOLUTION_INSTANCE_NAME}",
                 headers=get_evolution_headers(),
             )
             return response.status_code in (200, 204)
@@ -219,7 +223,7 @@ def delete_instance() -> bool:
     try:
         with httpx.Client(timeout=15.0) as client:
             response = client.delete(
-                f"{settings.EVOLUTION_API_URL}/instance/delete/{settings.EVOLUTION_INSTANCE_NAME}",
+                f"{_api_url()}/instance/delete/{settings.EVOLUTION_INSTANCE_NAME}",
                 headers=get_evolution_headers(),
             )
             return response.status_code in (200, 204)
