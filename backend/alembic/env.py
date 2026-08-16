@@ -11,6 +11,11 @@ from app.database import Base
 from app.models import Admin, Application, CommunicationLog, StatusHistory, EmailTemplate, WhatsAppTemplate, Interview
 
 config = context.config
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    # Render provides the production database through DATABASE_URL. The
+    # checked-in alembic.ini value is only a local-development fallback.
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
