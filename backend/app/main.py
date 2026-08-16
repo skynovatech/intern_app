@@ -10,6 +10,7 @@ from sqlalchemy import text as sql_text
 from app.database import engine, Base, SessionLocal, get_db
 from app.config import get_settings
 from app.models.admin import Admin
+from app.models.job import Job  # Ensure the job table is included in Base.metadata.
 from app.utils.security import get_password_hash
 from app.utils.rate_limiter import rate_limiter
 from app.services.websocket_manager import manager

@@ -3,6 +3,7 @@ from fastapi import status as http_status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from typing import Optional, List
 import os
 import uuid
@@ -87,18 +88,33 @@ def create_application(
     _=Depends(_public_rate_limit),
 ):
     db_application = Application(**application.model_dump())
-    db.add(db_application)
-    db.commit()
-    db.refresh(db_application)
-
-    enqueue_job("send_application_confirmation", {
-        "app_data": {
-            "id": db_application.id,
-            "full_name": db_application.full_name,
-            "email": db_application.email,
-            "whatsapp": db_application.whatsapp or db_application.mobile,
-        },
-    })
+    try:
+        db.add(db_application)
+        db.flush()
+        enqueue_job("send_application_confirmation", {
+            "app_data": {
+                "id": db_application.id,
+                "full_name": db_application.full_name,
+                "email": db_application.email,
+                "whatsapp": db_application.whatsapp or db_application.mobile,
+            },
+        }, db=db)
+        db.commit()
+        db.refresh(db_application)
+    except IntegrityError as exc:
+        db.rollback()
+        logger.warning("Application rejected by a database constraint: %s", exc)
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="An application with these details already exists.",
+        ) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Could not save application")
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The application database is temporarily unavailable. Please try again.",
+        ) from exc
 
     return db_application
 

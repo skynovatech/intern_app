@@ -27,8 +27,10 @@ def register_handler(kind: str, fn: Callable):
 
 
 def enqueue_job(kind: str, payload: Optional[dict] = None, run_at: Optional[datetime] = None,
-                max_attempts: int = 3, queue: str = "default") -> int:
-    db = SessionLocal()
+                max_attempts: int = 3, queue: str = "default", db: Optional[Session] = None) -> int:
+    owns_session = db is None
+    if owns_session:
+        db = SessionLocal()
     try:
         job = Job(
             kind=kind,
@@ -39,11 +41,20 @@ def enqueue_job(kind: str, payload: Optional[dict] = None, run_at: Optional[date
             run_at=run_at,
         )
         db.add(job)
-        db.commit()
+        if owns_session:
+            db.commit()
+        else:
+            # Keep the job and its application in the caller's transaction.
+            db.flush()
         db.refresh(job)
         return job.id
+    except Exception:
+        if owns_session:
+            db.rollback()
+        raise
     finally:
-        db.close()
+        if owns_session:
+            db.close()
 
 
 def _claim_next_job() -> tuple[Optional[Job], Optional[Session]]:
