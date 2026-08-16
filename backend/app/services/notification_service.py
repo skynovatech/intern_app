@@ -16,8 +16,10 @@ from app.services.notification_templates import (
     INTERVIEW_WHATSAPP_MSG,
     CONFIRMATION_EMAIL_BODY,
     CONFIRMATION_WHATSAPP_MSG,
+    OFFER_EMAIL_BODY,
+    OFFER_WHATSAPP_MSG,
 )
-from app.services.pdf_service import generate_application_pdf
+from app.services.pdf_service import generate_application_pdf, generate_offer_letter, generate_offer_letter_from_offer
 import base64
 import logging
 
@@ -27,16 +29,34 @@ settings = get_settings()
 CATEGORY_STATUS_CHANGE = "status_change"
 CATEGORY_INTERVIEW_SCHEDULED = "interview_scheduled"
 CATEGORY_CONFIRMATION = "application_confirmation"
+CATEGORY_OFFER_LETTER = "offer_letter"
 
 
-def _get_company_name() -> str:
+def _get_company_name(db=None) -> str:
+    if db is not None:
+        try:
+            from app.services.settings_service import get_setting_value
+            value = get_setting_value(db, "company_name", "")
+            if value:
+                return value
+        except Exception:
+            pass
     return settings.COMPANY_NAME or "Skynova Tech Solutions"
 
 
-def _wrap_html(body: str) -> str:
+def _get_employee_id_section(new_status: str, employee_id: Optional[str]) -> str:
+    if new_status == "Selected" and employee_id:
+        return (
+            f"Congratulations! You have been selected for the internship.\n"
+            f"Your Employee ID: {employee_id}\n\n"
+        )
+    return ""
+
+
+def _wrap_html(body: str, db=None) -> str:
     if "<html" in body.lower() or "<body" in body.lower():
         return body
-    company = _get_company_name()
+    company = _get_company_name(db)
     lines = body.split("\n")
     paragraphs = []
     for line in lines:
@@ -101,7 +121,7 @@ def _resolve_email_body(
     fallback_template: str,
     variables: dict,
 ) -> tuple[str, str]:
-    company = _get_company_name()
+    company = _get_company_name(db)
     tmpl = _get_active_email_template(db, category)
     if tmpl:
         subject = resolve_variables(tmpl.subject, None, company_name=company)
@@ -124,7 +144,7 @@ def _resolve_whatsapp_body(
     fallback_template: str,
     variables: dict,
 ) -> str:
-    company = _get_company_name()
+    company = _get_company_name(db)
     tmpl = _get_active_whatsapp_template(db, category)
     if tmpl:
         body = resolve_variables(tmpl.message, None, company_name=company)
@@ -145,14 +165,16 @@ def send_status_notification(
 ):
     db = SessionLocal()
     try:
-        company = _get_company_name()
+        company = _get_company_name(db)
         notes_section = f"Notes: {notes}" if notes else ""
+        employer = _get_employee_id_section(new_status, application_data.get("employee_id"))
         applicant_name = application_data["full_name"]
 
         variables = {
             "{applicant_name}": applicant_name,
             "{old_status}": old_status,
             "{new_status}": new_status,
+            "{employee_id_section}": employer,
             "{notes_section}": notes_section,
         }
 
@@ -222,7 +244,7 @@ def send_interview_notification(
 ):
     db = SessionLocal()
     try:
-        company = _get_company_name()
+        company = _get_company_name(db)
         notes_section = f"Notes: {notes}" if notes else ""
         applicant_name = application_data["full_name"]
 
@@ -291,7 +313,7 @@ def send_interview_notification(
 def send_application_confirmation(app_data: dict):
     db = SessionLocal()
     try:
-        company = _get_company_name()
+        company = _get_company_name(db)
         applicant_name = app_data["full_name"]
         app_id = str(app_data["id"])
 
@@ -370,14 +392,16 @@ def send_bulk_status_notifications(
 ):
     db = SessionLocal()
     try:
-        company = _get_company_name()
+        company = _get_company_name(db)
         for app_data in applications_data:
             notes_section = f"Notes: {app_data['notes']}" if app_data.get("notes") else ""
+            employee_section = _get_employee_id_section(new_status, app_data.get("employee_id"))
 
             variables = {
                 "{applicant_name}": app_data["full_name"],
                 "{old_status}": app_data["old_status"],
                 "{new_status}": new_status,
+                "{employee_id_section}": employee_section,
                 "{notes_section}": notes_section,
             }
 
@@ -424,6 +448,215 @@ def send_bulk_status_notifications(
         })
     except Exception as e:
         logger.error(f"Bulk notification failed: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def send_offer_letter_notification(application_id: int, sent_by: str):
+    db = SessionLocal()
+    try:
+        from app.models.application import Application
+        from app.models.offer_letter import OfferLetter
+        application = db.query(Application).filter(Application.id == application_id).first()
+        if not application:
+            logger.error(f"Offer letter notification failed: application {application_id} not found")
+            return
+
+        offer_letter = db.query(OfferLetter).filter(OfferLetter.application_id == application_id).first()
+        if not offer_letter:
+            offer_letter = OfferLetter(
+                application_id=application.id,
+                full_name=application.full_name,
+                email=application.email,
+                domain=application.domain,
+                duration=application.duration,
+                start_date=application.preferred_joining_date,
+                employee_id=application.employee_id,
+                status="draft",
+            )
+            db.add(offer_letter)
+            db.flush()
+
+        company = _get_company_name(db)
+        employee_id = application.employee_id or "TBD"
+        variables = {
+            "{applicant_name}": application.full_name,
+            "{employee_id}": employee_id,
+            "{domain}": application.domain,
+            "{duration}": application.duration,
+        }
+
+        subject, email_body = _resolve_email_body(
+            db, CATEGORY_OFFER_LETTER, OFFER_EMAIL_BODY, {
+                **variables,
+                "{subject}": f"Internship Offer Letter — {company}",
+            }
+        )
+
+        pdf_bytes = generate_offer_letter(application, db=db)
+
+        email_sent = False
+        try:
+            email_sent = send_email(
+                to_email=application.email,
+                subject=subject,
+                body=_wrap_html(email_body),
+                html=True,
+                attachments=[("Offer_Letter.pdf", pdf_bytes, "pdf")],
+            )
+        except Exception as email_err:
+            logger.error(f"Offer letter email failed: {email_err}")
+        db.add(CommunicationLog(
+            application_id=application.id,
+            channel="email",
+            subject=subject,
+            message=email_body + "\n\n[Offer letter PDF attached]",
+            status="sent" if email_sent else "failed",
+            sent_by=sent_by,
+        ))
+
+        wa_sent = False
+        pdf_sent = False
+        whatsapp_number = application.whatsapp or application.mobile
+        if whatsapp_number:
+            try:
+                wa_body = _resolve_whatsapp_body(
+                    db, CATEGORY_OFFER_LETTER, OFFER_WHATSAPP_MSG, variables
+                )
+                wa_sent = send_whatsapp_message(
+                    to_phone=whatsapp_number,
+                    message=wa_body,
+                )
+                try:
+                    pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+                    pdf_sent = send_whatsapp_media(
+                        to_phone=whatsapp_number,
+                        media_url=pdf_b64,
+                        caption=f"Offer Letter — {application.full_name}",
+                        filename=f"Offer_Letter_{application.full_name.replace(' ', '_')}.pdf",
+                    )
+                except Exception as media_err:
+                    logger.error(f"Offer letter WhatsApp media failed: {media_err}")
+            except Exception as wa_err:
+                logger.error(f"Offer letter WhatsApp failed: {wa_err}")
+            db.add(CommunicationLog(
+                application_id=application.id,
+                channel="whatsapp",
+                message=wa_body + ("\n\n[Offer letter PDF attached]" if pdf_sent else "") if whatsapp_number else "",
+                status="sent" if wa_sent else "failed",
+                sent_by=sent_by,
+            ))
+
+        db.commit()
+
+        manager.broadcast_sync("notification", {
+            "type": "offer_letter",
+            "application_id": application.id,
+            "employee_id": employee_id,
+        })
+    except Exception as e:
+        logger.error(f"Offer letter notification failed for application {application_id}: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def send_offer_letter_draft_notification(offer_id: int, sent_by: str):
+    db = SessionLocal()
+    try:
+        from app.models.offer_letter import OfferLetter
+        offer = db.query(OfferLetter).filter(OfferLetter.id == offer_id).first()
+        if not offer:
+            logger.error(f"Offer letter draft notification failed: offer letter {offer_id} not found")
+            return
+
+        company = _get_company_name(db)
+        variables = {
+            "{applicant_name}": offer.full_name,
+            "{employee_id}": offer.employee_id or "TBD",
+            "{domain}": offer.domain or "TBD",
+            "{duration}": offer.duration or "TBD",
+        }
+
+        subject, email_body = _resolve_email_body(
+            db, CATEGORY_OFFER_LETTER, OFFER_EMAIL_BODY, {
+                **variables,
+                "{subject}": f"Internship Offer Letter — {company}",
+            }
+        )
+
+        pdf_bytes = generate_offer_letter_from_offer(offer, db=db)
+
+        email_sent = False
+        try:
+            email_sent = send_email(
+                to_email=offer.email,
+                subject=subject,
+                body=_wrap_html(email_body),
+                html=True,
+                attachments=[("Offer_Letter.pdf", pdf_bytes, "pdf")],
+            )
+        except Exception as email_err:
+            logger.error(f"Offer letter draft email failed: {email_err}")
+        if offer.application_id:
+            db.add(CommunicationLog(
+                application_id=offer.application_id,
+                channel="email",
+                subject=subject,
+                message=email_body + "\n\n[Offer letter PDF attached]",
+                status="sent" if email_sent else "failed",
+                sent_by=sent_by,
+            ))
+
+        wa_sent = False
+        pdf_sent = False
+        whatsapp_number = offer.whatsapp
+        if whatsapp_number:
+            try:
+                wa_body = _resolve_whatsapp_body(
+                    db, CATEGORY_OFFER_LETTER, OFFER_WHATSAPP_MSG, variables
+                )
+                wa_sent = send_whatsapp_message(
+                    to_phone=whatsapp_number,
+                    message=wa_body,
+                )
+                try:
+                    pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+                    pdf_sent = send_whatsapp_media(
+                        to_phone=whatsapp_number,
+                        media_url=pdf_b64,
+                        caption=f"Offer Letter — {offer.full_name}",
+                        filename=f"Offer_Letter_{offer.full_name.replace(' ', '_')}.pdf",
+                    )
+                except Exception as media_err:
+                    logger.error(f"Offer letter draft WhatsApp media failed: {media_err}")
+            except Exception as wa_err:
+                logger.error(f"Offer letter draft WhatsApp failed: {wa_err}")
+            if offer.application_id:
+                db.add(CommunicationLog(
+                    application_id=offer.application_id,
+                    channel="whatsapp",
+                    message=wa_body + ("\n\n[Offer letter PDF attached]" if pdf_sent else ""),
+                    status="sent" if wa_sent else "failed",
+                    sent_by=sent_by,
+                ))
+
+        offer.status = "sent"
+        from datetime import datetime, timezone
+        offer.sent_at = datetime.now(timezone.utc)
+        db.add(offer)
+        db.commit()
+
+        manager.broadcast_sync("notification", {
+            "type": "offer_letter",
+            "offer_letter_id": offer.id,
+            "application_id": offer.application_id,
+            "employee_id": offer.employee_id,
+        })
+        logger.info(f"Offer letter draft {offer.id} sent to {offer.email} by {sent_by}")
+    except Exception as e:
+        logger.error(f"Offer letter draft notification failed for offer letter {offer_id}: {e}")
         db.rollback()
     finally:
         db.close()

@@ -3,7 +3,8 @@ import { Controller } from "react-hook-form";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { X, Plus } from "lucide-react";
 
 interface StepSkillsProps {
   control: any;
@@ -23,13 +24,18 @@ function TagInput({
 }) {
   const [input, setInput] = useState("");
 
+  const addCurrent = () => {
+    const tag = input.trim();
+    if (tag && !value.includes(tag)) {
+      onChange([...value, tag]);
+    }
+    setInput("");
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && input.trim()) {
+    if (e.key === "Enter") {
       e.preventDefault();
-      if (!value.includes(input.trim())) {
-        onChange([...value, input.trim()]);
-      }
-      setInput("");
+      addCurrent();
     }
   };
 
@@ -38,26 +44,41 @@ function TagInput({
   };
 
   return (
-    <div className="flex min-h-[36px] flex-wrap items-center gap-2 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm shadow-sm focus-within:ring-1 focus-within:ring-ring">
-      {value.map((tag) => (
-        <Badge key={tag} variant="secondary" className="gap-1">
-          {tag}
-          <button
-            type="button"
-            onClick={() => removeTag(tag)}
-            className="ml-0.5 rounded-full hover:bg-muted"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </Badge>
-      ))}
-      <input
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={value.length === 0 ? placeholder : ""}
-        className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground min-w-[120px]"
-      />
+    <div>
+      <div className="flex min-h-[36px] flex-wrap items-center gap-2 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm shadow-sm focus-within:ring-1 focus-within:ring-ring">
+        {value.map((tag) => (
+          <Badge key={tag} variant="secondary" className="gap-1">
+            {tag}
+            <button
+              type="button"
+              onClick={() => removeTag(tag)}
+              className="ml-0.5 rounded-full hover:bg-muted"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        ))}
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={value.length === 0 ? placeholder : ""}
+          className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground min-w-[120px]"
+        />
+      </div>
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">{value.length} added</span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={addCurrent}
+          disabled={!input.trim()}
+          className="h-8 gap-1.5"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add
+        </Button>
+      </div>
     </div>
   );
 }
@@ -92,7 +113,7 @@ export default function StepSkills({
               <TagInput
                 value={technicalSkills}
                 onChange={(val) => setValue("technical_skills", val)}
-                placeholder="Type a skill and press Enter"
+                placeholder="Type a skill, then tap Add"
               />
             )}
           />
@@ -112,7 +133,7 @@ export default function StepSkills({
               <TagInput
                 value={softSkills}
                 onChange={(val) => setValue("soft_skills", val)}
-                placeholder="Type a skill and press Enter"
+                placeholder="Type a skill, then tap Add"
               />
             )}
           />

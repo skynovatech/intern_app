@@ -41,6 +41,7 @@ class Application(Base):
     status = Column(String(50), default="Pending", nullable=False)
     rating = Column(Integer, default=0)
     notes = Column(Text, nullable=True)
+    employee_id = Column(String(50), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

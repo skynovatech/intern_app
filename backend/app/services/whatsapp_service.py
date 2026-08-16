@@ -190,6 +190,13 @@ def send_whatsapp_media(
             logger.warning(f"WhatsApp media timeout attempt {attempt}/{MAX_RETRIES}")
             if attempt < MAX_RETRIES:
                 time.sleep(RETRY_DELAY_SECONDS * attempt)
+        except httpx.HTTPStatusError as e:
+            last_error = e
+            logger.warning(
+                f"WhatsApp media HTTP {e.response.status_code} attempt {attempt}/{MAX_RETRIES}: {e.response.text[:500]}"
+            )
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_DELAY_SECONDS * attempt)
         except Exception as e:
             last_error = e
             logger.warning(f"WhatsApp media attempt {attempt}/{MAX_RETRIES} failed: {e}")
@@ -217,16 +224,88 @@ def logout_instance() -> bool:
 
 
 def delete_instance() -> bool:
-    if not settings.EVOLUTION_API_KEY or not settings.EVOLUTION_INSTANCE_NAME:
+    return delete_instance_by_name(settings.EVOLUTION_INSTANCE_NAME)
+
+
+def delete_instance_by_name(instance_name: str) -> bool:
+    if not settings.EVOLUTION_API_KEY or not instance_name:
         return False
 
     try:
         with httpx.Client(timeout=15.0) as client:
             response = client.delete(
-                f"{_api_url()}/instance/delete/{settings.EVOLUTION_INSTANCE_NAME}",
+                f"{_api_url()}/instance/delete/{instance_name}",
                 headers=get_evolution_headers(),
             )
             return response.status_code in (200, 204)
     except Exception as e:
-        logger.error(f"Failed to delete instance: {e}")
+        logger.error(f"Failed to delete instance {instance_name}: {e}")
         return False
+
+
+def fetch_instances() -> list[dict]:
+    """Fetch all instances from Evolution API with their connections and API keys."""
+    if not settings.EVOLUTION_API_KEY:
+        return []
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            response = client.get(
+                f"{_api_url()}/instance/fetchInstances",
+                headers=get_evolution_headers(),
+            )
+        if response.status_code != 200:
+            logger.error(
+                f"Failed to fetch instances (HTTP {response.status_code}): {response.text}"
+            )
+            return []
+
+        data = response.json()
+        instances = []
+        for item in data or []:
+            inst = item.get("instance", item)
+            instance_name = (
+                item.get("instanceName")
+                or inst.get("instanceName")
+                or inst.get("name")
+            )
+            if not instance_name:
+                continue
+            instances.append({
+                "name": instance_name,
+                "instance_id": inst.get("id") or inst.get("instanceId"),
+                "apikey": inst.get("apikey") or inst.get("Apikey") or "",
+                "owner_jid": inst.get("ownerJid") or inst.get("owner"),
+                "connection_name": inst.get("connectionName") or "",
+                "created_at": inst.get("createdAt") or inst.get("created_at"),
+                "state": (
+                    item.get("connectionState")
+                    or item.get("state")
+                    or inst.get("connectionState")
+                    or "unknown"
+                ),
+            })
+        return instances
+    except httpx.ConnectError:
+        logger.error("Evolution API server unreachable while fetching instances")
+        return []
+    except Exception as e:
+        logger.error(f"Failed to fetch instances: {e}")
+        return []
+
+
+def rename_instance(instance_name: str, new_name: str) -> tuple[bool, str]:
+    if not settings.EVOLUTION_API_KEY or not instance_name or not new_name:
+        return False, "Missing instance or new name"
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            response = client.post(
+                f"{_api_url()}/instance/rename",
+                json={"instanceName": instance_name, "newInstanceName": new_name},
+                headers=get_evolution_headers(),
+            )
+        if response.status_code in (200, 201, 204):
+            return True, "Renamed successfully"
+        return False, f"HTTP {response.status_code}: {response.text}"
+    except Exception as e:
+        logger.error(f"Failed to rename instance {instance_name}: {e}")
+        return False, str(e)

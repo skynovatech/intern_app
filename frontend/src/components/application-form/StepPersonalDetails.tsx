@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { GENDER_OPTIONS } from "@/types";
+import { useGenders } from "@/stores/lookupsStore";
 
 interface StepPersonalDetailsProps {
   control: any;
@@ -20,6 +20,7 @@ export default function StepPersonalDetails({
   control,
   errors,
 }: StepPersonalDetailsProps) {
+  const genders = useGenders();
   return (
     <div className="space-y-6">
       <div>
@@ -146,7 +147,7 @@ export default function StepPersonalDetails({
                   <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent>
-                  {GENDER_OPTIONS.map((option) => (
+                  {genders.map((option) => (
                     <SelectItem key={option} value={option}>
                       {option}
                     </SelectItem>

@@ -8,10 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DEGREE_OPTIONS as degrees,
-  YEAR_OPTIONS as years,
-} from "@/types";
+import { useDegrees, useYears } from "@/stores/lookupsStore";
 
 interface StepEducationProps {
   control: any;
@@ -22,6 +19,8 @@ export default function StepEducation({
   control,
   errors,
 }: StepEducationProps) {
+  const degrees = useDegrees();
+  const years = useYears();
   return (
     <div className="space-y-6">
       <div>

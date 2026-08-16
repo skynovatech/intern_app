@@ -35,6 +35,19 @@ class ApplicationCreate(BaseModel):
     resume_path: Optional[str] = None
     photo_path: Optional[str] = None
 
+    @field_validator("resume_path", "photo_path")
+    @classmethod
+    def validate_upload_path(cls, v):
+        if v is None or v == "":
+            return v
+        p = v.replace("\\", "/")
+        parts = [seg for seg in p.split("/") if seg not in ("", ".", "..")]
+        joined = "/".join(parts)
+        allowed_prefixes = ("photos/", "resumes/", "uploads/photos/", "uploads/resumes/")
+        if not joined.startswith(allowed_prefixes) or any(seg == ".." for seg in p.split("/")):
+            raise ValueError("resume_path/photo_path must reference an uploaded file under photos/ or resumes/")
+        return v
+
     @field_validator("mobile")
     @classmethod
     def validate_mobile(cls, v):
@@ -152,6 +165,7 @@ class ApplicationResponse(BaseModel):
     status: str
     rating: int
     notes: Optional[str] = None
+    employee_id: Optional[str] = None
 
     created_at: datetime
     updated_at: datetime

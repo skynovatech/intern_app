@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.admin import Admin
@@ -24,8 +24,9 @@ settings = get_settings()
 ALLOWED_AVATAR_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 
-def _auth_rate_limit():
-    rate_limiter.check("auth_login", max_requests=10, window_seconds=60)
+def _auth_rate_limit(request: Request):
+    rate_limiter.check("auth_login", max_requests=10, window_seconds=60,
+                       ip=request.client.host if request.client else None)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -53,7 +54,10 @@ def login(request: LoginRequest, db: Session = Depends(get_db), _=Depends(_auth_
     )
     db.add(refresh_token)
     db.commit()
-
+    from app.services.audit_service import write_audit_log
+    write_audit_log(db, admin.email, "login", "auth", admin.id, f"Admin {admin.email} logged in",
+                    actor_name=admin.full_name)
+    db.commit()
     return TokenResponse(access_token=access_token, refresh_token=raw_refresh)
 
 

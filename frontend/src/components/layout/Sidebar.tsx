@@ -10,6 +10,8 @@ import {
   Mail,
   MessageSquare,
   Settings,
+  FileText,
+  LayoutTemplate,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/appStore";
@@ -20,6 +22,8 @@ const navItems = [
   { label: "Applications", icon: Users, to: "/applications" },
   { label: "Analytics", icon: BarChart3, to: "/analytics" },
   { label: "Templates", icon: Mail, to: "/templates" },
+  { label: "Offer Letters", icon: FileText, to: "/offer-letters" },
+  { label: "Letter Template", icon: LayoutTemplate, to: "/offer-letter-templates" },
   { label: "WhatsApp", icon: MessageSquare, to: "/whatsapp" },
   { label: "Settings", icon: Settings, to: "/settings" },
 ] as const;

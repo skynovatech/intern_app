@@ -463,7 +463,7 @@ export function TemplatesPage() {
 
       {/* Email Template Dialog */}
       <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingEmail ? "Edit Email Template" : "New Email Template"}
@@ -566,7 +566,7 @@ export function TemplatesPage() {
 
       {/* WhatsApp Template Dialog */}
       <Dialog open={whatsappDialogOpen} onOpenChange={setWhatsappDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {editingWhatsapp ? "Edit WhatsApp Template" : "New WhatsApp Template"}
@@ -649,7 +649,7 @@ function TemplateVariablesDropdown({ variables }: { variables: TemplateVariable[
         <Info className="h-3 w-3" /> Available Variables
       </button>
       {open && (
-        <div className="absolute right-0 top-6 z-50 w-64 rounded-lg border bg-card p-3 shadow-lg">
+        <div className="absolute right-0 top-6 z-50 w-[min(80vw,16rem)] rounded-lg border bg-card p-3 shadow-lg">
           <p className="mb-2 text-xs font-medium text-foreground">Insert a variable:</p>
           <div className="space-y-1">
             {variables.map((v) => (

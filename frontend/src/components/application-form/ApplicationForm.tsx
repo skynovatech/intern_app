@@ -253,8 +253,8 @@ export default function ApplicationForm() {
   return (
     <div className="mx-auto w-full max-w-3xl">
       <div className="mb-8">
-        <nav aria-label="Progress">
-          <ol className="flex items-center">
+        <nav aria-label="Progress" className="overflow-x-auto pb-1">
+          <ol className="flex items-center min-w-max">
             {STEP_LABELS.map((label, index) => {
               const isCompleted = index < currentStep;
               const isCurrent = index === currentStep;

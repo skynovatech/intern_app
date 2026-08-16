@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
@@ -33,9 +33,13 @@ from app.services.whatsapp_service import (
     get_qr_code,
     logout_instance,
     delete_instance,
+    delete_instance_by_name,
+    fetch_instances,
+    rename_instance,
 )
 from app.config import get_settings
 from app.services import notification_templates as default_tpls
+from app.services import job_queue
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +108,6 @@ def _bulk_email_background(
 )
 def bulk_send_email(
     email_request: BulkSendEmailRequest,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_admin=Depends(require_role("admin")),
 ):
@@ -114,17 +117,16 @@ def bulk_send_email(
 
     applications_data = [{"id": app.id, "email": app.email, "_app": _app_to_dict(app)} for app in applications]
 
-    background_tasks.add_task(
-        _bulk_email_background,
-        applications_data=applications_data,
-        subject=email_request.subject,
-        message=email_request.message,
-        html=email_request.html,
-        sent_by=current_admin.email,
-    )
+    job_queue.enqueue_job("bulk_email", payload={
+        "applications_data": applications_data,
+        "subject": email_request.subject,
+        "message": email_request.message,
+        "html": email_request.html,
+        "sent_by": current_admin.email,
+    })
 
     return {
-        "message": f"Email sending initiated for {len(applications)} applicant(s)",
+        "message": f"Email sending queued for {len(applications)} applicant(s)",
         "total": len(applications),
     }
 
@@ -177,7 +179,6 @@ def _bulk_whatsapp_background(
 )
 def bulk_send_whatsapp(
     whatsapp_request: BulkSendWhatsAppRequest,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_admin=Depends(require_role("admin")),
 ):
@@ -190,15 +191,14 @@ def bulk_send_whatsapp(
         for app in applications
     ]
 
-    background_tasks.add_task(
-        _bulk_whatsapp_background,
-        applications_data=applications_data,
-        message=whatsapp_request.message,
-        sent_by=current_admin.email,
-    )
+    job_queue.enqueue_job("bulk_whatsapp", payload={
+        "applications_data": applications_data,
+        "message": whatsapp_request.message,
+        "sent_by": current_admin.email,
+    })
 
     return {
-        "message": f"WhatsApp sending initiated for {len(applications)} applicant(s)",
+        "message": f"WhatsApp sending queued for {len(applications)} applicant(s)",
         "total": len(applications),
     }
 
@@ -537,6 +537,10 @@ class CreateInstanceRequest(BaseModel):
     number: str
 
 
+class RenameInstanceRequest(BaseModel):
+    new_instance_name: str
+
+
 @router.get("/whatsapp/status", response_model=WhatsAppStatusResponse)
 def get_whatsapp_status(
     current_admin=Depends(get_current_admin),
@@ -599,6 +603,48 @@ def whatsapp_delete_instance(
             detail="Failed to delete WhatsApp instance",
         )
     return {"message": "WhatsApp instance deleted successfully"}
+
+
+@router.get("/whatsapp/instances")
+def whatsapp_list_instances(
+    current_admin=Depends(get_current_admin),
+):
+    instances = fetch_instances()
+    if not instances:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No instances found or Evolution API server unreachable",
+        )
+    return {"instances": instances}
+
+
+@router.post("/whatsapp/instances/{instance_name}/rename")
+def whatsapp_rename_instance(
+    instance_name: str,
+    request: RenameInstanceRequest,
+    current_admin=Depends(get_current_admin),
+):
+    success, message = rename_instance(instance_name, request.new_instance_name)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to rename instance: {message}",
+        )
+    return {"message": message, "old_name": instance_name, "new_name": request.new_instance_name}
+
+
+@router.delete("/whatsapp/instances/{instance_name}")
+def whatsapp_delete_instance_by_name(
+    instance_name: str,
+    current_admin=Depends(get_current_admin),
+):
+    success = delete_instance_by_name(instance_name)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to delete WhatsApp instance",
+        )
+    return {"message": f"Instance '{instance_name}' deleted successfully"}
 
 
 @router.post("/whatsapp/instance")

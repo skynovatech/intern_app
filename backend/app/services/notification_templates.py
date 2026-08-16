@@ -6,6 +6,7 @@ Your application status has been updated.
 Previous Status: {old_status}
 New Status: {new_status}
 
+{employee_id_section}
 {notes_section}
 If you have any questions, please don't hesitate to reach out.
 
@@ -18,6 +19,7 @@ STATUS_WHATSAPP_MSG = (
     "Your application status has been updated.\n"
     "Previous: {old_status}\n"
     "New: {new_status}\n\n"
+    "{employee_id_section}"
     "{notes_section}"
 )
 
@@ -70,4 +72,30 @@ CONFIRMATION_WHATSAPP_MSG = (
     "Thank you for applying to {company_name}!\n\n"
     "Your application (ID: {application_id}) has been received successfully.\n\n"
     "We will review it and get back to you soon."
+)
+
+OFFER_EMAIL_BODY = """\
+Hi {applicant_name},
+
+Congratulations! We are pleased to offer you an internship at {company_name}.
+
+Your Employee ID: {employee_id}
+Domain: {domain}
+Duration: {duration}
+
+Please find your offer letter attached to this email. Kindly review the details.
+
+We look forward to having you on board.
+
+Best regards,
+{company_name} Recruitment Team
+"""
+
+OFFER_WHATSAPP_MSG = (
+    "Hi {applicant_name},\n\n"
+    "Congratulations! You have been selected for an internship at {company_name}.\n"
+    "Your Employee ID: {employee_id}\n"
+    "Domain: {domain}\n"
+    "Duration: {duration}\n\n"
+    "Your offer letter has been sent to your email."
 )

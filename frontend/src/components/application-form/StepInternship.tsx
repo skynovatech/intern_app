@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DOMAIN_OPTIONS, DURATION_OPTIONS } from "@/types";
+import { useDomains, useDurations } from "@/stores/lookupsStore";
 
 interface StepInternshipProps {
   control: any;
@@ -19,6 +19,8 @@ export default function StepInternship({
   control,
   errors,
 }: StepInternshipProps) {
+  const domains = useDomains();
+  const durations = useDurations();
   return (
     <div className="space-y-6">
       <div>
@@ -42,7 +44,7 @@ export default function StepInternship({
                   <SelectValue placeholder="Select domain" />
                 </SelectTrigger>
                 <SelectContent>
-                  {DOMAIN_OPTIONS.map((option) => (
+                  {domains.map((option) => (
                     <SelectItem key={option} value={option}>
                       {option}
                     </SelectItem>
@@ -71,7 +73,7 @@ export default function StepInternship({
                   <SelectValue placeholder="Select duration" />
                 </SelectTrigger>
                 <SelectContent>
-                  {DURATION_OPTIONS.map((option) => (
+                  {durations.map((option) => (
                     <SelectItem key={option} value={option}>
                       {option}
                     </SelectItem>

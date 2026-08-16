@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import {
-  User, Mail, Lock, KeyRound, Camera, Trash2, Save, Loader2,
+  User, Lock, KeyRound, Camera, Trash2, Save, Loader2,
 } from "lucide-react";
 import api from "@/lib/api";
 import { toast } from "@/components/ui/use-toast";
@@ -10,10 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthStore } from "@/stores/authStore";
+import { CompanySettingsTab } from "@/components/settings/CompanySettingsTab";
+import { LookupsTab } from "@/components/settings/LookupsTab";
+import { AdminUsersTab } from "@/components/settings/AdminUsersTab";
+import { SystemDefaultsTab } from "@/components/settings/SystemDefaultsTab";
+import { AuditLogsTab } from "@/components/settings/AuditLogsTab";
+import { BackupExportTab } from "@/components/settings/BackupExportTab";
 
 export function AdminSettingsPage() {
-  const { admin, setAuth, token } = useAuthStore();
+  const { admin } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [profileForm, setProfileForm] = useState({
@@ -113,148 +120,188 @@ export function AdminSettingsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground">Settings</h2>
-        <p className="text-sm text-muted-foreground">Manage your profile, password, and avatar.</p>
+        <p className="text-sm text-muted-foreground">
+          Manage your profile, company information, and configurable options.
+        </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <User className="h-4 w-4 text-primary" /> Profile
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="flex items-center gap-5">
-            <div className="relative group">
-              <Avatar className="h-20 w-20 border-2 border-border">
-                <AvatarImage src={avatarUrl ?? undefined} alt={admin?.full_name} />
-                <AvatarFallback className="bg-primary/10 text-lg font-bold text-primary">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center justify-center h-full w-full"
-                  disabled={uploading}
-                >
-                  {uploading ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-white" />
-                  ) : (
-                    <Camera className="h-6 w-6 text-white" />
+      <Tabs defaultValue="profile" className="w-full">
+        <TabsList className="justify-start">
+          <TabsTrigger value="profile">Profile &amp; Security</TabsTrigger>
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="lists">Lists</TabsTrigger>
+          <TabsTrigger value="admins">Admin Users</TabsTrigger>
+          <TabsTrigger value="defaults">System Defaults</TabsTrigger>
+          <TabsTrigger value="audit">Audit Log</TabsTrigger>
+          <TabsTrigger value="backup">Backup &amp; Export</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="profile" className="mt-4 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <User className="h-4 w-4 text-primary" /> Profile
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex items-center gap-5">
+                <div className="relative group">
+                  <Avatar className="h-20 w-20 border-2 border-border">
+                    <AvatarImage src={avatarUrl ?? undefined} alt={admin?.full_name} />
+                    <AvatarFallback className="bg-primary/10 text-lg font-bold text-primary">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center justify-center h-full w-full"
+                      disabled={uploading}
+                    >
+                      {uploading ? (
+                        <Loader2 className="h-6 w-6 animate-spin text-white" />
+                      ) : (
+                        <Camera className="h-6 w-6 text-white" />
+                      )}
+                    </button>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleUploadAvatar}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{admin?.full_name}</p>
+                  <p className="text-xs text-muted-foreground">{admin?.email}</p>
+                  {admin?.avatar_path && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs text-destructive hover:text-destructive px-0"
+                      onClick={handleRemoveAvatar}
+                      disabled={uploading}
+                    >
+                      <Trash2 className="mr-1 h-3 w-3" /> Remove
+                    </Button>
                   )}
-                </button>
+                </div>
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleUploadAvatar}
-              />
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium">{admin?.full_name}</p>
-              <p className="text-xs text-muted-foreground">{admin?.email}</p>
-              {admin?.avatar_path && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-xs text-destructive hover:text-destructive px-0"
-                  onClick={handleRemoveAvatar}
-                  disabled={uploading}
-                >
-                  <Trash2 className="mr-1 h-3 w-3" /> Remove
-                </Button>
-              )}
-            </div>
-          </div>
 
-          <Separator />
+              <Separator />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="settings-name">Full Name</Label>
-              <Input
-                id="settings-name"
-                value={profileForm.full_name}
-                onChange={(e) => setProfileForm({ ...profileForm, full_name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="settings-email">Email</Label>
-              <Input
-                id="settings-email"
-                type="email"
-                value={profileForm.email}
-                onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-              />
-            </div>
-          </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="settings-name">Full Name</Label>
+                  <Input
+                    id="settings-name"
+                    value={profileForm.full_name}
+                    onChange={(e) => setProfileForm({ ...profileForm, full_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="settings-email">Email</Label>
+                  <Input
+                    id="settings-email"
+                    type="email"
+                    value={profileForm.email}
+                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                  />
+                </div>
+              </div>
 
-          <Button onClick={handleSaveProfile} disabled={savingProfile}>
-            {savingProfile ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="mr-2 h-4 w-4" />
-            )}
-            Save Changes
-          </Button>
-        </CardContent>
-      </Card>
+              <Button onClick={handleSaveProfile} disabled={savingProfile}>
+                {savingProfile ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Save Changes
+              </Button>
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Lock className="h-4 w-4 text-primary" /> Change Password
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="settings-current-pw">Current Password</Label>
-            <Input
-              id="settings-current-pw"
-              type="password"
-              value={passwordForm.current_password}
-              onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="settings-new-pw">New Password</Label>
-              <Input
-                id="settings-new-pw"
-                type="password"
-                value={passwordForm.new_password}
-                onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="settings-confirm-pw">Confirm New Password</Label>
-              <Input
-                id="settings-confirm-pw"
-                type="password"
-                value={passwordForm.confirm_password}
-                onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
-              />
-            </div>
-          </div>
-          <Button
-            onClick={handleChangePassword}
-            disabled={changingPassword || !passwordForm.current_password || !passwordForm.new_password || !passwordForm.confirm_password}
-          >
-            {changingPassword ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <KeyRound className="mr-2 h-4 w-4" />
-            )}
-            Change Password
-          </Button>
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Lock className="h-4 w-4 text-primary" /> Change Password
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="settings-current-pw">Current Password</Label>
+                <Input
+                  id="settings-current-pw"
+                  type="password"
+                  value={passwordForm.current_password}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="settings-new-pw">New Password</Label>
+                  <Input
+                    id="settings-new-pw"
+                    type="password"
+                    value={passwordForm.new_password}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="settings-confirm-pw">Confirm New Password</Label>
+                  <Input
+                    id="settings-confirm-pw"
+                    type="password"
+                    value={passwordForm.confirm_password}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={handleChangePassword}
+                disabled={changingPassword || !passwordForm.current_password || !passwordForm.new_password || !passwordForm.confirm_password}
+              >
+                {changingPassword ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <KeyRound className="mr-2 h-4 w-4" />
+                )}
+                Change Password
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="company" className="mt-4">
+          <CompanySettingsTab />
+        </TabsContent>
+
+        <TabsContent value="lists" className="mt-4">
+          <LookupsTab />
+        </TabsContent>
+
+        <TabsContent value="admins" className="mt-4">
+          <AdminUsersTab />
+        </TabsContent>
+
+        <TabsContent value="defaults" className="mt-4">
+          <SystemDefaultsTab />
+        </TabsContent>
+
+        <TabsContent value="audit" className="mt-4">
+          <AuditLogsTab />
+        </TabsContent>
+
+        <TabsContent value="backup" className="mt-4">
+          <BackupExportTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 import logging
@@ -13,10 +13,9 @@ from app.schemas.status import (
 )
 from app.utils.dependencies import get_current_admin
 from app.utils.permissions import require_role
-from app.services.notification_service import (
-    send_status_notification,
-    send_interview_notification,
-)
+from app.services.employee_service import generate_employee_id
+from app.services.job_queue import enqueue_job
+from app.services.audit_service import write_audit_log
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +26,6 @@ router = APIRouter(tags=["Status Management"])
 async def update_status(
     application_id: int,
     status_update: StatusUpdate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_admin=Depends(require_role("admin")),
 ):
@@ -37,6 +35,11 @@ async def update_status(
 
     old_status = application.status
     application.status = status_update.new_status
+
+    employee_id = application.employee_id
+    if status_update.new_status == "Selected" and not employee_id:
+        employee_id = generate_employee_id(db)
+        application.employee_id = employee_id
 
     history_entry = StatusHistory(
         application_id=application_id,
@@ -49,22 +52,36 @@ async def update_status(
     db.commit()
     db.refresh(history_entry)
 
+    write_audit_log(
+        db, current_admin.email, "status_update", "application", application.id,
+        f"Updated status for {application.full_name}: {old_status} → {status_update.new_status}",
+        {"old": old_status, "new": status_update.new_status, "notes": status_update.notes},
+        actor_name=current_admin.full_name,
+    )
+    db.commit()
+
     app_data = {
         "id": application.id,
         "full_name": application.full_name,
         "email": application.email,
         "whatsapp": application.whatsapp or application.mobile,
         "mobile": application.mobile,
+        "employee_id": employee_id,
     }
 
-    background_tasks.add_task(
-        send_status_notification,
-        application_data=app_data,
-        old_status=old_status,
-        new_status=status_update.new_status,
-        notes=status_update.notes,
-        sent_by=current_admin.email,
-    )
+    enqueue_job("send_status_notification", {
+        "application_data": app_data,
+        "old_status": old_status,
+        "new_status": status_update.new_status,
+        "notes": status_update.notes,
+        "sent_by": current_admin.email,
+    })
+
+    if status_update.new_status == "Selected":
+        enqueue_job("send_offer_letter_notification", {
+            "application_id": application.id,
+            "sent_by": current_admin.email,
+        })
 
     return history_entry
 
@@ -126,7 +143,6 @@ def update_notes(
 async def schedule_interview(
     application_id: int,
     interview_schedule: InterviewSchedule,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin),
 ):
@@ -168,17 +184,16 @@ async def schedule_interview(
         "mobile": application.mobile,
     }
 
-    background_tasks.add_task(
-        send_interview_notification,
-        application_data=app_data,
-        scheduled_date=interview_schedule.scheduled_date,
-        scheduled_time=interview_schedule.scheduled_time,
-        interview_type=interview_schedule.interview_type,
-        interviewer=interview_schedule.interviewer,
-        location=interview_schedule.location,
-        notes=interview_schedule.notes,
-        sent_by=current_admin.email,
-    )
+    enqueue_job("send_interview_notification", {
+        "application_data": app_data,
+        "scheduled_date": interview_schedule.scheduled_date,
+        "scheduled_time": interview_schedule.scheduled_time,
+        "interview_type": interview_schedule.interview_type,
+        "interviewer": interview_schedule.interviewer,
+        "location": interview_schedule.location,
+        "notes": interview_schedule.notes,
+        "sent_by": current_admin.email,
+    })
 
     return interview
 

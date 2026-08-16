@@ -131,7 +131,7 @@ export function DashboardPage() {
                     label={({ name, percent }) =>
                       `${(name ?? "").length > 12 ? (name ?? "").slice(0, 12) + "..." : name} (${((percent ?? 0) * 100).toFixed(0)}%)`
                     }
-                    outerRadius={100}
+                    outerRadius="65%"
                     fill="#8884d8"
                     dataKey="value"
                   >
@@ -208,10 +208,10 @@ export function DashboardPage() {
                 <Link
                   key={app.id}
                   to={`/applications/${app.id}`}
-                  className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-accent/50"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-accent/50"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
                       <span className="text-sm font-medium text-primary">
                         {app.full_name
                           .split(" ")
@@ -222,15 +222,15 @@ export function DashboardPage() {
                       </span>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">
+                      <p className="truncate text-sm font-medium text-foreground">
                         {app.full_name}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="truncate text-xs text-muted-foreground">
                         {app.college} &middot; {app.domain}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-3">
                     <Badge className={STATUS_COLORS[app.status] ?? ""}>
                       {app.status}
                     </Badge>

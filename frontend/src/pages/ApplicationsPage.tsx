@@ -1,19 +1,18 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-  Eye, Star, MoreHorizontal, ArrowUpDown, Download,
+  Eye, Star, MoreHorizontal, ArrowUpDown,
   CheckCircle, XCircle, Mail, MessageSquare, Calendar,
   CheckCheck, X, Send, FolderDown, SlidersHorizontal, RotateCcw,
-  FilterX, FileDown, Loader2,
+  FilterX, FileDown, Loader2, Trash2, Columns3, List as ListIcon,
 } from "lucide-react";
+import { KanbanBoard } from "@/components/applications/KanbanBoard";
 import type { Application, PaginatedResponse } from "@/types";
-import {
-  APPLICATION_STATUSES, STATUS_COLORS, DOMAIN_OPTIONS,
-  GENDER_OPTIONS, YEAR_OPTIONS, DEGREE_OPTIONS, DURATION_OPTIONS,
-} from "@/types";
+import { STATUS_COLORS } from "@/types";
+import { useStatuses, useDomains, useGenders, useYears, useDegrees, useDurations } from "@/stores/lookupsStore";
 import api from "@/lib/api";
-import { formatDate } from "@/lib/utils";
+import { formatDate, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,25 +40,27 @@ import { Card, CardContent } from "@/components/ui/card";
 type SortField = "id" | "full_name" | "email" | "college" | "domain" | "status" | "rating" | "created_at";
 type SortOrder = "asc" | "desc";
 
-const FILTER_OPTIONS = [
-  { key: "status", label: "Status", options: ["all", ...APPLICATION_STATUSES] },
-  { key: "domain", label: "Domain", options: ["all", ...DOMAIN_OPTIONS] },
-  { key: "gender", label: "Gender", options: ["all", ...GENDER_OPTIONS] },
-  { key: "degree", label: "Degree", options: ["all", ...DEGREE_OPTIONS] },
-  { key: "year", label: "Year", options: ["all", ...YEAR_OPTIONS] },
-  { key: "duration", label: "Duration", options: ["all", ...DURATION_OPTIONS] },
-] as const;
-
 export function ApplicationsPage() {
+  const statuses = useStatuses();
+  const domains = useDomains();
+  const genders = useGenders();
+  const years = useYears();
+  const degrees = useDegrees();
+  const durations = useDurations();
+
+  const [searchParams] = useSearchParams();
   const [data, setData] = useState<Application[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [perPage] = useState(10);
+  const [view, setView] = useState<"table" | "kanban">("table");
   const [loading, setLoading] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [statusFilter, setStatusFilter] = useState("all");
   const [domainFilter, setDomainFilter] = useState("all");
   const [genderFilter, setGenderFilter] = useState("all");
@@ -94,7 +95,8 @@ export function ApplicationsPage() {
 
   const fetchData = useCallback(async () => {
     try { setLoading(true);
-      const params: Record<string, string | number> = { page, per_page: perPage, sort_by: sortBy, sort_order: sortOrder };
+      const effectivePerPage = view === "kanban" ? 10000 : perPage;
+      const params: Record<string, string | number> = { page: view === "kanban" ? 1 : page, per_page: effectivePerPage, sort_by: sortBy, sort_order: sortOrder };
       if (search) params.search = search;
       if (statusFilter !== "all") params.status = statusFilter;
       if (domainFilter !== "all") params.domain = domainFilter;
@@ -113,7 +115,7 @@ export function ApplicationsPage() {
     } catch {
       toast({ title: "Failed to load applications", variant: "destructive" });
     } finally { setLoading(false); }
-  }, [page, perPage, search, statusFilter, domainFilter, genderFilter, degreeFilter, yearFilter, durationFilter, cgpaMin, cgpaMax, dateFrom, dateTo, sortBy, sortOrder]);
+  }, [page, perPage, view, search, statusFilter, domainFilter, genderFilter, degreeFilter, yearFilter, durationFilter, cgpaMin, cgpaMax, dateFrom, dateTo, sortBy, sortOrder]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { setPage(1); }, [search, statusFilter, domainFilter, genderFilter, degreeFilter, yearFilter, durationFilter, cgpaMin, cgpaMax, dateFrom, dateTo]);
@@ -139,7 +141,34 @@ export function ApplicationsPage() {
     }
   };
 
-  const toggleSelect = (id: number) => setSelectedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const handleDeleteApplication = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/applications/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      toast({ title: "Application deleted", description: `${deleteTarget.full_name} was removed`, variant: "success" });
+      fetchData();
+    } catch {
+      toast({ title: "Failed to delete application", variant: "destructive" });
+    } finally { setDeleting(false); }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedIds.size) return;
+    setDeleting(true);
+    try {
+      await Promise.all(Array.from(selectedIds).map((id) => api.delete(`/applications/${id}`)));
+      const count = selectedIds.size;
+      setSelectedIds(new Set());
+      toast({ title: "Applications deleted", description: `${count} application(s) removed`, variant: "success" });
+      fetchData();
+    } catch {
+      toast({ title: "Bulk delete failed", variant: "destructive" });
+    } finally { setDeleting(false); }
+  };
+
+  const toggleSelect = (id: number) => setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) { n.delete(id); } else { n.add(id); } return n; });
   const toggleSelectAll = () => setSelectedIds(selectedIds.size === data.length ? new Set() : new Set(data.map((a) => a.id)));
   const clearSelection = () => setSelectedIds(new Set());
 
@@ -259,7 +288,25 @@ export function ApplicationsPage() {
           <h2 className="text-2xl font-bold text-foreground tracking-tight">Applications</h2>
           <p className="text-sm text-muted-foreground mt-0.5">{total} total application{total !== 1 ? "s" : ""}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center rounded-lg border border-border bg-background p-0.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setView("table")}
+              className={cn("h-8 gap-1.5 text-xs", view === "table" ? "bg-primary/10 text-primary" : "text-muted-foreground")}
+            >
+              <ListIcon className="h-4 w-4" /> Table
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setView("kanban")}
+              className={cn("h-8 gap-1.5 text-xs", view === "kanban" ? "bg-primary/10 text-primary" : "text-muted-foreground")}
+            >
+              <Columns3 className="h-4 w-4" /> Pipeline
+            </Button>
+          </div>
           <Button variant="outline" size="sm" onClick={() => setFiltersOpen(!filtersOpen)} className={hasActiveFilters ? "border-primary" : ""}>
             <SlidersHorizontal className="mr-1.5 h-4 w-4" />
             Filters
@@ -287,12 +334,12 @@ export function ApplicationsPage() {
               </Button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <FilterSelect value={statusFilter} onChange={setStatusFilter} options={["all", ...APPLICATION_STATUSES]} label="Status" />
-              <FilterSelect value={domainFilter} onChange={setDomainFilter} options={["all", ...DOMAIN_OPTIONS]} label="Domain" />
-              <FilterSelect value={genderFilter} onChange={setGenderFilter} options={["all", ...GENDER_OPTIONS]} label="Gender" />
-              <FilterSelect value={degreeFilter} onChange={setDegreeFilter} options={["all", ...DEGREE_OPTIONS]} label="Degree" />
-              <FilterSelect value={yearFilter} onChange={setYearFilter} options={["all", ...YEAR_OPTIONS]} label="Year" />
-              <FilterSelect value={durationFilter} onChange={setDurationFilter} options={["all", ...DURATION_OPTIONS]} label="Duration" />
+              <FilterSelect value={statusFilter} onChange={setStatusFilter} options={["all", ...statuses]} label="Status" />
+              <FilterSelect value={domainFilter} onChange={setDomainFilter} options={["all", ...domains]} label="Domain" />
+              <FilterSelect value={genderFilter} onChange={setGenderFilter} options={["all", ...genders]} label="Gender" />
+              <FilterSelect value={degreeFilter} onChange={setDegreeFilter} options={["all", ...degrees]} label="Degree" />
+              <FilterSelect value={yearFilter} onChange={setYearFilter} options={["all", ...years]} label="Year" />
+              <FilterSelect value={durationFilter} onChange={setDurationFilter} options={["all", ...durations]} label="Duration" />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
@@ -349,6 +396,9 @@ export function ApplicationsPage() {
             }
           }} disabled={bulkProcessing} className="h-8 text-xs">
             <FolderDown className="mr-1 h-3.5 w-3.5" /> Download
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleBulkDelete} disabled={bulkProcessing || deleting} className="h-8 text-xs text-red-600 hover:text-red-700">
+            {deleting ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Trash2 className="mr-1 h-3.5 w-3.5" />} Delete
           </Button>
           <div className="flex-1" />
           <Button variant="ghost" size="sm" onClick={clearSelection} disabled={bulkProcessing} className="h-8 text-xs text-muted-foreground">
@@ -428,12 +478,41 @@ export function ApplicationsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Application</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-foreground">{deleteTarget?.full_name}</span>? This will
+              permanently remove the application, its resume, and photo. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={handleDeleteApplication} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {view === "kanban" ? (
+        <KanbanBoard
+          applications={data}
+          loading={loading}
+          onStatusChange={handleStatusChange}
+          refetch={fetchData}
+        />
+      ) : (
+        <>
       <div className="overflow-hidden rounded-xl border border-border">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">
               <TableHead className="w-10"><Checkbox checked={data.length > 0 && selectedIds.size === data.length} onChange={toggleSelectAll} aria-label="Select all applications" /></TableHead>
-              <TableHead className="cursor-pointer select-none w-16" onClick={() => handleSort("id")} aria-sort={sortBy === "id" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}><span className="flex items-center text-xs">ID <SortIcon field="id" /></span></TableHead>
+              <TableHead className="cursor-pointer select-none hidden sm:table-cell w-16" onClick={() => handleSort("id")} aria-sort={sortBy === "id" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}><span className="flex items-center text-xs">ID <SortIcon field="id" /></span></TableHead>
               <TableHead className="cursor-pointer select-none min-w-[140px]" onClick={() => handleSort("full_name")} aria-sort={sortBy === "full_name" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}><span className="flex items-center text-xs">Name <SortIcon field="full_name" /></span></TableHead>
               <TableHead className="cursor-pointer select-none hidden md:table-cell min-w-[180px]" onClick={() => handleSort("email")} aria-sort={sortBy === "email" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}><span className="flex items-center text-xs">Email <SortIcon field="email" /></span></TableHead>
               <TableHead className="cursor-pointer select-none hidden lg:table-cell" onClick={() => handleSort("college")} aria-sort={sortBy === "college" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}><span className="flex items-center text-xs">College <SortIcon field="college" /></span></TableHead>
@@ -455,7 +534,7 @@ export function ApplicationsPage() {
               data.map((app) => (
                 <TableRow key={app.id} className={`group transition-colors ${selectedIds.has(app.id) ? "bg-primary/5" : "hover:bg-muted/50"}`}>
                   <TableCell><Checkbox checked={selectedIds.has(app.id)} onChange={() => toggleSelect(app.id)} /></TableCell>
-                  <TableCell className="text-xs text-muted-foreground font-mono tabular-nums">#{app.id}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground font-mono tabular-nums hidden sm:table-cell">#{app.id}</TableCell>
                   <TableCell>
                     <Link to={`/applications/${app.id}`} className="font-medium text-sm hover:text-primary transition-colors">
                       {app.full_name}
@@ -492,7 +571,14 @@ export function ApplicationsPage() {
                         <DropdownMenuContent align="end" className="min-w-40">
                           <DropdownMenuItem asChild><Link to={`/applications/${app.id}`}><Eye className="mr-2 h-4 w-4" />View Details</Link></DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          {APPLICATION_STATUSES.map((s) => (
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-700"
+                            onClick={() => setDeleteTarget(app)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />Delete Application
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {statuses.map((s) => (
                             <DropdownMenuItem key={s} disabled={app.status === s} onClick={() => handleStatusChange(app.id, s)}>
                               Move to {s}
                             </DropdownMenuItem>
@@ -525,11 +611,11 @@ export function ApplicationsPage() {
           <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * perPage + 1} to {Math.min(page * perPage, total)} of {total}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)} className="h-9">
               <ChevronLeft className="h-4 w-4 mr-1" /> Previous
             </Button>
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
               {Array.from({ length: totalPages }).map((_, i) => {
                 const p = i + 1;
                 if (p === 1 || p === totalPages || (p >= page - 1 && p <= page + 1))
@@ -543,6 +629,8 @@ export function ApplicationsPage() {
             </Button>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

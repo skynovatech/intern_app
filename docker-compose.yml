@@ -20,7 +20,7 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:12345@db:5432/internship_ats
       EVOLUTION_API_URL: http://evolution-api:8085
-      CORS_ORIGINS: https://intern-app-pink.vercel.app,https://intern-app-lxil.onrender.com
+      CORS_ORIGINS: https://intern-app-pink.vercel.app,https://intern-app-lxil.onrender.com,http://localhost:5173,http://127.0.0.1:5173
     depends_on:
       db:
         condition: service_healthy
@@ -39,14 +39,14 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redisdata:/data
 
   evolution-api:
-    image: atendiamo/evolution-api:latest
+    image: evoapicloud/evolution-api:v2.3.7
     ports:
-      - "8085:8085"
+      - "8085:8080"
     environment:
       DATABASE_ENABLED: "true"
       DATABASE_CONNECTION_URI: postgresql://postgres:12345@db:5432/evolution

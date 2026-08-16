@@ -134,7 +134,7 @@ export function AnalyticsPage() {
       bg: "bg-blue-500/10",
     },
     {
-      label: "Acceptance Rate",
+      label: "Selection Rate",
       value:
         stats.total > 0
           ? `${((stats.selected / stats.total) * 100).toFixed(1)}%`
@@ -180,9 +180,9 @@ export function AnalyticsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
         {summaryStats.map((stat) => (
-          <div key={stat.label} className="glass rounded-xl p-5">
+          <div key={stat.label} className="glass rounded-xl p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
@@ -247,7 +247,7 @@ export function AnalyticsPage() {
                     label={({ name, percent }) =>
                       `${(name ?? "").length > 15 ? (name ?? "").slice(0, 15) + "..." : name} (${((percent ?? 0) * 100).toFixed(0)}%)`
                     }
-                    outerRadius={100}
+                    outerRadius="65%"
                     fill="#8884d8"
                     dataKey="value"
                   >
@@ -285,7 +285,7 @@ export function AnalyticsPage() {
                     label={({ name, percent }) =>
                       `${name ?? ""} (${((percent ?? 0) * 100).toFixed(0)}%)`
                     }
-                    outerRadius={100}
+                    outerRadius="65%"
                     fill="#8884d8"
                     dataKey="value"
                   >
@@ -360,7 +360,7 @@ export function AnalyticsPage() {
                   maxValue > 0 ? (item.value / maxValue) * 100 : 0;
                 return (
                   <div key={item.name} className="flex items-center gap-4">
-                    <div className="w-40 shrink-0 text-right text-sm font-medium text-muted-foreground">
+                    <div className="w-32 sm:w-40 shrink-0 text-right text-sm font-medium text-muted-foreground">
                       {item.name}
                     </div>
                     <div className="relative h-8 flex-1 overflow-hidden rounded-lg bg-muted/30">
@@ -377,7 +377,7 @@ export function AnalyticsPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="w-16 text-right text-xs text-muted-foreground">
+                    <div className="w-14 shrink-0 text-right text-xs text-muted-foreground">
                       {percentage.toFixed(1)}%
                     </div>
                   </div>

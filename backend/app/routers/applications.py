@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Request
 from fastapi import status as http_status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
@@ -27,12 +27,9 @@ from app.utils.dependencies import get_current_admin
 from app.utils.permissions import require_role
 from app.utils.rate_limiter import rate_limiter
 from app.config import get_settings
-from app.services.email_service import send_email
-from app.services.whatsapp_service import send_whatsapp_message
 from app.services.pdf_service import generate_application_pdf, generate_bulk_pdf
-from app.services.notification_service import (
-    send_bulk_status_notifications, send_application_confirmation, send_interview_notification,
-)
+from app.services.employee_service import generate_employee_id
+from app.services.job_queue import enqueue_job
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +39,24 @@ settings = get_settings()
 ALLOWED_RESUME_EXTENSIONS = {".pdf"}
 ALLOWED_PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".jfif", ".tiff", ".bmp"}
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+
+
+def _safe_upload_path(rel_path):
+    """Return an absolute path inside UPLOAD_DIR for a stored upload, or None if unsafe."""
+    if not rel_path:
+        return None
+    p = str(rel_path).replace("\\", "/")
+    parts = [seg for seg in p.split("/") if seg not in ("", ".")]
+    if any(seg == ".." for seg in parts):
+        return None
+    joined = "/".join(parts)
+    if not joined.startswith(("photos/", "resumes/")):
+        return None
+    root = os.path.abspath(settings.UPLOAD_DIR)
+    full = os.path.abspath(os.path.join(root, joined))
+    if not full.startswith(root + os.sep):
+        return None
+    return full
 
 
 def save_upload_file(file: UploadFile, subdirectory: str) -> str:
@@ -60,14 +75,14 @@ def save_upload_file(file: UploadFile, subdirectory: str) -> str:
     return f"{subdirectory}/{unique_filename}"
 
 
-def _public_rate_limit():
-    rate_limiter.check("public_applications", max_requests=10, window_seconds=60)
+def _public_rate_limit(request: Request):
+    rate_limiter.check("public_applications", max_requests=10, window_seconds=60,
+                       ip=request.client.host if request.client else None)
 
 
 @router.post("", response_model=ApplicationResponse, status_code=http_status.HTTP_201_CREATED)
 def create_application(
     application: ApplicationCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _=Depends(_public_rate_limit),
 ):
@@ -76,15 +91,14 @@ def create_application(
     db.commit()
     db.refresh(db_application)
 
-    background_tasks.add_task(
-        send_application_confirmation,
-        app_data={
+    enqueue_job("send_application_confirmation", {
+        "app_data": {
             "id": db_application.id,
             "full_name": db_application.full_name,
             "email": db_application.email,
             "whatsapp": db_application.whatsapp or db_application.mobile,
         },
-    )
+    })
 
     return db_application
 
@@ -92,7 +106,7 @@ def create_application(
 @router.get("", response_model=ApplicationListResponse)
 def list_applications(
     page: int = Query(1, ge=1),
-    per_page: int = Query(10, ge=1, le=100),
+    per_page: int = Query(10, ge=1, le=10000),
     search: Optional[str] = None,
     status: Optional[str] = None,
     domain: Optional[str] = None,
@@ -218,17 +232,12 @@ def delete_application(
     application = db.query(Application).filter(Application.id == application_id).first()
     if not application:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Application not found")
-    
-    if application.resume_path:
-        resume_full_path = os.path.join(settings.UPLOAD_DIR, application.resume_path)
-        if os.path.exists(resume_full_path):
-            os.remove(resume_full_path)
-    
-    if application.photo_path:
-        photo_full_path = os.path.join(settings.UPLOAD_DIR, application.photo_path)
-        if os.path.exists(photo_full_path):
-            os.remove(photo_full_path)
-    
+
+    for stored in (application.resume_path, application.photo_path):
+        safe = _safe_upload_path(stored)
+        if safe and os.path.exists(safe):
+            os.remove(safe)
+
     db.delete(application)
     db.commit()
 
@@ -252,8 +261,8 @@ async def upload_resume(
         )
     
     if application.resume_path:
-        old_path = os.path.join(settings.UPLOAD_DIR, application.resume_path)
-        if os.path.exists(old_path):
+        old_path = _safe_upload_path(application.resume_path)
+        if old_path and os.path.exists(old_path):
             os.remove(old_path)
     
     file_path = save_upload_file(file, "resumes")
@@ -283,8 +292,8 @@ async def upload_photo(
         )
     
     if application.photo_path:
-        old_path = os.path.join(settings.UPLOAD_DIR, application.photo_path)
-        if os.path.exists(old_path):
+        old_path = _safe_upload_path(application.photo_path)
+        if old_path and os.path.exists(old_path):
             os.remove(old_path)
     
     file_path = save_upload_file(file, "photos")
@@ -298,7 +307,6 @@ async def upload_photo(
 @router.put("/bulk/status", response_model=dict)
 def bulk_update_status(
     bulk_update: BulkStatusUpdate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_admin=Depends(require_role("admin")),
 ):
@@ -312,6 +320,11 @@ def bulk_update_status(
     for application in applications:
         old_status = application.status
         application.status = bulk_update.new_status
+
+        employee_id = application.employee_id
+        if bulk_update.new_status == "Selected" and not employee_id:
+            employee_id = generate_employee_id(db)
+            application.employee_id = employee_id
 
         history_entry = StatusHistory(
             application_id=application.id,
@@ -328,16 +341,23 @@ def bulk_update_status(
             "whatsapp": application.whatsapp or application.mobile,
             "old_status": old_status,
             "notes": bulk_update.notes,
+            "employee_id": employee_id,
         })
 
     db.commit()
 
-    background_tasks.add_task(
-        send_bulk_status_notifications,
-        applications_data=applications_data,
-        new_status=bulk_update.new_status,
-        sent_by=current_admin.email,
-    )
+    enqueue_job("send_bulk_status_notifications", {
+        "applications_data": applications_data,
+        "new_status": bulk_update.new_status,
+        "sent_by": current_admin.email,
+    })
+
+    if bulk_update.new_status == "Selected":
+        for application in applications:
+            enqueue_job("send_offer_letter_notification", {
+                "application_id": application.id,
+                "sent_by": current_admin.email,
+            })
 
     return {
         "message": f"Updated {len(applications)} application(s) to '{bulk_update.new_status}'",
@@ -349,7 +369,6 @@ def bulk_update_status(
 @router.post("/bulk/interview", response_model=dict)
 def bulk_schedule_interview(
     bulk_interview: BulkInterviewSchedule,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_admin=Depends(require_role("admin")),
 ):
@@ -386,23 +405,22 @@ def bulk_schedule_interview(
         db.add(interview)
         scheduled_count += 1
 
-        background_tasks.add_task(
-            send_interview_notification,
-            application_data={
+        enqueue_job("send_interview_notification", {
+            "application_data": {
                 "id": application.id,
                 "full_name": application.full_name,
                 "email": application.email,
                 "whatsapp": application.whatsapp or application.mobile,
                 "mobile": application.mobile,
             },
-            scheduled_date=bulk_interview.scheduled_date,
-            scheduled_time=bulk_interview.scheduled_time,
-            interview_type=bulk_interview.interview_type,
-            interviewer=bulk_interview.interviewer,
-            location=bulk_interview.location,
-            notes=bulk_interview.notes,
-            sent_by=current_admin.email,
-        )
+            "scheduled_date": bulk_interview.scheduled_date,
+            "scheduled_time": bulk_interview.scheduled_time,
+            "interview_type": bulk_interview.interview_type,
+            "interviewer": bulk_interview.interviewer,
+            "location": bulk_interview.location,
+            "notes": bulk_interview.notes,
+            "sent_by": current_admin.email,
+        })
 
     db.commit()
 

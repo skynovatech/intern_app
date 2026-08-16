@@ -1,0 +1,21 @@
+DATABASE_URL=postgresql://postgres:12345@localhost:5432/internship_ats
+SECRET_KEY=3b5ac27908163a0e2fe9ee90024f3f393ddb48176d39aa5217aa8a364eed64d3
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+ADMIN_EMAIL=admin@admin.com
+ADMIN_PASSWORD=admin
+UPLOAD_DIR=uploads
+
+CORS_ORIGINS=https://intern-app-pink.vercel.app,https://intern-app-lxil.onrender.com
+
+COMPANY_NAME=Skynova Tech Solutions
+
+# Brevo (Email)
+BREVO_API_KEY=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
+SMTP_FROM_EMAIL=hr@skynovatech.in
+SMTP_FROM_NAME=Skynova Tech Solutions
+
+# Evolution API (WhatsApp) - Free, Self-Hosted
+EVOLUTION_API_URL=http://localhost:8085
+EVOLUTION_API_KEY=D65A862AD2DD-419C-A1DC-40F007D4B745
+EVOLUTION_INSTANCE_NAME=ats-whatsapp

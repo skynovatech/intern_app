@@ -5,6 +5,8 @@ import { ApplicationsPage } from "@/pages/ApplicationsPage";
 import { ApplicationDetailPage } from "@/pages/ApplicationDetailPage";
 import { AnalyticsPage } from "@/pages/AnalyticsPage";
 import { TemplatesPage } from "@/pages/TemplatesPage";
+import { OfferLetterTemplatesPage } from "@/pages/OfferLetterTemplatesPage";
+import { OfferLettersPage } from "@/pages/OfferLettersPage";
 import { WhatsAppConfigPage } from "@/pages/WhatsAppConfigPage";
 import { AdminSettingsPage } from "@/pages/AdminSettingsPage";
 import { ApplyPage } from "@/pages/ApplyPage";
@@ -63,6 +65,22 @@ function App() {
           element={
             <AdminLayout>
               <WhatsAppConfigPage />
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/offer-letters"
+          element={
+            <AdminLayout>
+              <OfferLettersPage />
+            </AdminLayout>
+          }
+        />
+        <Route
+          path="/offer-letter-templates"
+          element={
+            <AdminLayout>
+              <OfferLetterTemplatesPage />
             </AdminLayout>
           }
         />

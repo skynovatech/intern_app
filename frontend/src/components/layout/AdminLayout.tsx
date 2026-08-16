@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { Menu, Search, Sun, Moon } from "lucide-react";
+import { Menu, Sun, Moon } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useAppStore } from "@/stores/appStore";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 interface AdminLayoutProps {
@@ -41,7 +42,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       <div className="lg:pl-64">
         <header className="sticky top-0 z-20 glass border-b border-border">
           <div className="flex h-16 items-center justify-between px-4 lg:px-6">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="rounded-md p-2 text-muted-foreground hover:text-foreground lg:hidden"
@@ -49,20 +50,16 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               >
                 <Menu className="h-5 w-5" />
               </button>
-              <h1 className="text-lg font-semibold text-foreground">
+              <h1 className="hidden text-lg font-semibold text-foreground sm:block">
                 Skynova Tech Solutions
+              </h1>
+              <h1 className="truncate text-lg font-semibold text-foreground sm:hidden">
+                Skynova
               </h1>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="hidden items-center gap-2 rounded-lg border border-border bg-background/50 px-3 py-1.5 md:flex">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-48 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-                />
-              </div>
+              <GlobalSearch />
 
               <button
                 onClick={toggleDarkMode}

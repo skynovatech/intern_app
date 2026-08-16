@@ -24,17 +24,26 @@ class Settings(BaseSettings):
 
     # Company
     COMPANY_NAME: str = "Skynova Tech Solutions"
+    COMPANY_TAGLINE: str = "A Global Entity of Skynova Tech Solutions"
+    COMPANY_PHONE: str = ""
+    COMPANY_EMAIL: str = ""
+    COMPANY_ADDRESS: str = ""
 
     # App URL (used for generating links in notifications, WhatsApp media, etc.)
-    APP_URL: str = "http://localhost:8000"
+    APP_URL: str = "http://127.0.0.1:8000"
 
     # CORS
-    CORS_ORIGINS: str = "https://intern-app-pink.vercel.app,https://intern-app-lxil.onrender.com"
+    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # Evolution API (WhatsApp)
     EVOLUTION_API_URL: str = "http://localhost:8085"
     EVOLUTION_API_KEY: str = ""
     EVOLUTION_INSTANCE_NAME: str = "ats-whatsapp"
+
+    # Interview reminders (auto-notifications)
+    REMINDER_ENABLED: bool = True
+    REMINDER_HOURS_BEFORE: int = 24
+    REMINDER_INTERVAL_MINUTES: int = 60
 
     class Config:
         env_file = ".env"

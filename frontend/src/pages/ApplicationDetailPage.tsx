@@ -1,17 +1,20 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Star, Calendar, ExternalLink, GitBranch, Link as LinkIcon,
   Globe, Save, Send, FileText, User, GraduationCap, Briefcase,
   Wrench, Link2, Download, Mail, Phone, MapPin, Cake, Building2,
   BookOpen, Clock, ChevronRight, MessageSquare, BadgeCheck,
-  Loader2, Activity, History, MessageCircle, Image, Edit2,
+  Loader2, Activity, History, MessageCircle, Image, Edit2, Trash2,
 } from "lucide-react";
 import type {
   Application, StatusHistoryEntry, Interview, CommunicationLog,
   EmailTemplate, WhatsAppTemplate,
 } from "@/types";
-import { APPLICATION_STATUSES, STATUS_COLORS } from "@/types";
+import { STATUS_COLORS } from "@/types";
+import {
+  useStatuses, useDomains, useDegrees, useYears, useDurations, useGenders, useInterviewTypes,
+} from "@/stores/lookupsStore";
 import api from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
@@ -28,11 +31,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const INTERVIEW_TYPES = ["Video", "In-Person", "Phone"] as const;
 
 function fileUrl(path: string | null): string {
   if (!path) return "";
@@ -40,8 +41,42 @@ function fileUrl(path: string | null): string {
   return `/uploads/${path}`;
 }
 
+interface EditForm {
+  full_name: string;
+  email: string;
+  mobile: string;
+  whatsapp: string;
+  dob: string;
+  gender: string;
+  address: string;
+  college: string;
+  degree: string;
+  department: string;
+  current_year: string;
+  cgpa: string;
+  domain: string;
+  duration: string;
+  preferred_joining_date: string;
+  technical_skills: string;
+  soft_skills: string;
+  projects: string;
+  certifications: string;
+  github: string;
+  linkedin: string;
+  portfolio: string;
+}
+
 export function ApplicationDetailPage() {
+  const statuses = useStatuses();
+  const domains = useDomains();
+  const degrees = useDegrees();
+  const years = useYears();
+  const durations = useDurations();
+  const genders = useGenders();
+  const interviewTypes = useInterviewTypes();
+
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [app, setApp] = useState<Application | null>(null);
   const [history, setHistory] = useState<StatusHistoryEntry[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
@@ -66,9 +101,87 @@ export function ApplicationDetailPage() {
 
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadingPhoto, setDownloadingPhoto] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [editingRemarks, setEditingRemarks] = useState<Record<number, string>>({});
   const [savingRemarks, setSavingRemarks] = useState<Record<number, boolean>>({});
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEdit = () => {
+    if (!app) return;
+    setEditForm({
+      full_name: app.full_name,
+      email: app.email,
+      mobile: app.mobile,
+      whatsapp: app.whatsapp ?? "",
+      dob: app.dob ?? "",
+      gender: app.gender,
+      address: app.address ?? "",
+      college: app.college,
+      degree: app.degree,
+      department: app.department,
+      current_year: app.current_year,
+      cgpa: app.cgpa != null ? String(app.cgpa) : "",
+      domain: app.domain,
+      duration: app.duration,
+      preferred_joining_date: app.preferred_joining_date ?? "",
+      technical_skills: app.technical_skills?.join(", ") ?? "",
+      soft_skills: app.soft_skills?.join(", ") ?? "",
+      projects: app.projects ?? "",
+      certifications: app.certifications ?? "",
+      github: app.github ?? "",
+      linkedin: app.linkedin ?? "",
+      portfolio: app.portfolio ?? "",
+    });
+    setEditOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!id || !editForm) return;
+    setSavingEdit(true);
+    try {
+      const payload = {
+        full_name: editForm.full_name,
+        email: editForm.email,
+        mobile: editForm.mobile,
+        whatsapp: editForm.whatsapp || null,
+        dob: editForm.dob || null,
+        gender: editForm.gender,
+        address: editForm.address || null,
+        college: editForm.college,
+        degree: editForm.degree,
+        department: editForm.department,
+        current_year: editForm.current_year,
+        cgpa: editForm.cgpa ? Number(editForm.cgpa) : null,
+        domain: editForm.domain,
+        duration: editForm.duration,
+        preferred_joining_date: editForm.preferred_joining_date || null,
+        technical_skills: editForm.technical_skills ? editForm.technical_skills.split(",").map((s) => s.trim()).filter(Boolean) : null,
+        soft_skills: editForm.soft_skills ? editForm.soft_skills.split(",").map((s) => s.trim()).filter(Boolean) : null,
+        projects: editForm.projects || null,
+        certifications: editForm.certifications || null,
+        github: editForm.github || null,
+        linkedin: editForm.linkedin || null,
+        portfolio: editForm.portfolio || null,
+      };
+      const res = await api.put<Application>(`/applications/${id}`, payload);
+      setApp(res.data);
+      toast({ title: "Application updated", variant: "success" });
+      setEditOpen(false);
+    } catch {
+      toast({ title: "Failed to update application", variant: "destructive" });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const setEditField = (key: keyof EditForm, value: string) => {
+    setEditForm((f) => (f ? { ...f, [key]: value } : f));
+  };
 
   const fetchData = useCallback(async () => {
     if (!id) {
@@ -169,6 +282,18 @@ export function ApplicationDetailPage() {
     } finally { setSendingWhatsapp(false); }
   };
 
+  const handleDeleteApplication = async () => {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/applications/${id}`);
+      toast({ title: "Application deleted", description: "The application was removed", variant: "success" });
+      navigate("/applications");
+    } catch {
+      toast({ title: "Failed to delete application", variant: "destructive" });
+    } finally { setDeleting(false); }
+  };
+
   const handleDownloadPdf = async () => {
     if (!id) return;
     setDownloadingPdf(true);
@@ -263,8 +388,170 @@ export function ApplicationDetailPage() {
               Photo
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={openEdit} className="h-8">
+            <Edit2 className="mr-1.5 h-3.5 w-3.5" />
+            Edit
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)} className="h-8 text-red-600 hover:text-red-700 hover:border-red-300">
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            Delete
+          </Button>
         </div>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Application</DialogTitle>
+          </DialogHeader>
+          {editForm && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Full Name</Label>
+                <Input value={editForm.full_name} onChange={(e) => setEditField("full_name", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email</Label>
+                <Input value={editForm.email} onChange={(e) => setEditField("email", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Mobile</Label>
+                <Input value={editForm.mobile} onChange={(e) => setEditField("mobile", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>WhatsApp</Label>
+                <Input value={editForm.whatsapp} onChange={(e) => setEditField("whatsapp", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Date of Birth</Label>
+                <Input type="date" value={editForm.dob} onChange={(e) => setEditField("dob", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Gender</Label>
+                <Select value={editForm.gender} onValueChange={(v) => setEditField("gender", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {genders.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Address</Label>
+                <Input value={editForm.address} onChange={(e) => setEditField("address", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>College / University</Label>
+                <Input value={editForm.college} onChange={(e) => setEditField("college", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Degree</Label>
+                <Select value={editForm.degree} onValueChange={(v) => setEditField("degree", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {degrees.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Department</Label>
+                <Input value={editForm.department} onChange={(e) => setEditField("department", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Current Year</Label>
+                <Select value={editForm.current_year} onValueChange={(v) => setEditField("current_year", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>CGPA</Label>
+                <Input inputMode="decimal" value={editForm.cgpa} onChange={(e) => setEditField("cgpa", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Domain</Label>
+                <Select value={editForm.domain} onValueChange={(v) => setEditField("domain", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {domains.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Duration</Label>
+                <Select value={editForm.duration} onValueChange={(v) => setEditField("duration", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {durations.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Preferred Joining Date</Label>
+                <Input type="date" value={editForm.preferred_joining_date} onChange={(e) => setEditField("preferred_joining_date", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>GitHub</Label>
+                <Input value={editForm.github} onChange={(e) => setEditField("github", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>LinkedIn</Label>
+                <Input value={editForm.linkedin} onChange={(e) => setEditField("linkedin", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Portfolio</Label>
+                <Input value={editForm.portfolio} onChange={(e) => setEditField("portfolio", e.target.value)} />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Technical Skills (comma separated)</Label>
+                <Input value={editForm.technical_skills} onChange={(e) => setEditField("technical_skills", e.target.value)} />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Soft Skills (comma separated)</Label>
+                <Input value={editForm.soft_skills} onChange={(e) => setEditField("soft_skills", e.target.value)} />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Projects</Label>
+                <Textarea rows={3} value={editForm.projects} onChange={(e) => setEditField("projects", e.target.value)} />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Certifications</Label>
+                <Textarea rows={2} value={editForm.certifications} onChange={(e) => setEditField("certifications", e.target.value)} />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <DialogClose asChild>
+              <Button variant="ghost">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Application</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-foreground">{app.full_name}</span>? This will permanently
+              remove the application, its resume, and photo. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={handleDeleteApplication} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="overflow-hidden">
         <div className="flex flex-col sm:flex-row">
@@ -299,12 +586,12 @@ export function ApplicationDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           <Tabs defaultValue="profile" className="space-y-6">
-            <TabsList>
-              <TabsTrigger value="profile"><User className="h-4 w-4 mr-2" />Profile</TabsTrigger>
-              <TabsTrigger value="timeline"><History className="h-4 w-4 mr-2" />Timeline</TabsTrigger>
-              <TabsTrigger value="interviews"><Briefcase className="h-4 w-4 mr-2" />Interviews</TabsTrigger>
-              <TabsTrigger value="communications"><MessageCircle className="h-4 w-4 mr-2" />Communications</TabsTrigger>
-              <TabsTrigger value="resume"><FileText className="h-4 w-4 mr-2" />Resume</TabsTrigger>
+            <TabsList className="w-full justify-start">
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="timeline">Timeline</TabsTrigger>
+              <TabsTrigger value="interviews">Interviews</TabsTrigger>
+              <TabsTrigger value="communications">Communications</TabsTrigger>
+              <TabsTrigger value="resume">Resume</TabsTrigger>
             </TabsList>
 
             <TabsContent value="profile" className="space-y-6 mt-0">
@@ -419,7 +706,7 @@ export function ApplicationDetailPage() {
             </TabsContent>
 
             <TabsContent value="interviews" className="space-y-4 mt-0">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-muted-foreground">{interviews.length} interview{interviews.length !== 1 ? "s" : ""} scheduled</p>
                 <Button size="sm" onClick={() => setInterviewDialogOpen(true)}>
                   <Calendar className="mr-1.5 h-4 w-4" /> Schedule Interview
@@ -485,9 +772,9 @@ export function ApplicationDetailPage() {
             </TabsContent>
 
             <TabsContent value="communications" className="space-y-4 mt-0">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-muted-foreground">{communications.length} communication{communications.length !== 1 ? "s" : ""}</p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => setEmailDialogOpen(true)}><Mail className="mr-1.5 h-4 w-4" /> Send Email</Button>
                   <Button size="sm" variant="outline" onClick={() => setWhatsappDialogOpen(true)}><MessageSquare className="mr-1.5 h-4 w-4" /> Send WhatsApp</Button>
                 </div>
@@ -519,7 +806,7 @@ export function ApplicationDetailPage() {
                 <Card>
                   <CardContent className="p-0">
                     {app.resume_path.endsWith(".pdf") ? (
-                      <iframe src={resumeSrc} className="h-[600px] w-full rounded-lg" title="Resume Preview" />
+                      <iframe src={resumeSrc} className="h-[60vh] min-h-[320px] w-full rounded-lg" title="Resume Preview" />
                     ) : (
                       <div className="flex flex-col items-center py-12">
                         <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -542,7 +829,7 @@ export function ApplicationDetailPage() {
                 <Select value={app.status} onValueChange={handleStatusChange}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {APPLICATION_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {statuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -591,7 +878,7 @@ export function ApplicationDetailPage() {
             <div className="space-y-2"><Label>Type</Label>
               <Select value={interviewForm.interview_type} onValueChange={(v) => setInterviewForm({ ...interviewForm, interview_type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{INTERVIEW_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                <SelectContent>{interviewTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Interviewer</Label><Input value={interviewForm.interviewer} onChange={(e) => setInterviewForm({ ...interviewForm, interviewer: e.target.value })} placeholder="Interviewer name" /></div>
@@ -623,7 +910,7 @@ export function ApplicationDetailPage() {
             )}
             <div className="space-y-2"><Label>Subject</Label><Input value={emailForm.subject} onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })} placeholder="Email subject..." /></div>
             <div className="space-y-2"><Label>Message</Label><Textarea value={emailForm.message} onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })} placeholder="Type your email message..." rows={8} /></div>
-            <div className="flex items-center gap-2">
+<div className="flex flex-wrap justify-end gap-2">
               <input type="checkbox" id="html-toggle" checked={emailForm.html} onChange={(e) => setEmailForm({ ...emailForm, html: e.target.checked })} className="h-4 w-4 rounded border-border accent-indigo-600" />
               <Label htmlFor="html-toggle" className="text-sm">HTML format</Label>
             </div>

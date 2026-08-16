@@ -1,0 +1,125 @@
+App Recieved : 
+
+
+
+📩 *APPLICATION RECEIVED*
+
+Hello *{applicant_name},*
+
+Thank you for your interest in joining *{company_name}*.
+
+We're pleased to inform you that your application has been received successfully and is now being reviewed by our Recruitment Team.
+
+━━━━━━━━━━━━━━━━━━
+
+🆔 *Application ID*
+{application_id}
+
+📌 *Current Status*
+Application Received
+
+━━━━━━━━━━━━━━━━━━
+
+📎 Your application summary has been attached for your reference.
+
+Our team will carefully review your application and notify you of any updates regarding the next stage of the recruitment process.
+
+If you have any questions, simply reply to this message or contact our Recruitment Team.
+
+Thank you for choosing *{company_name}*. We appreciate your interest and wish you the very best.
+
+Best regards,
+
+*{company_name} Recruitment Team*
+
+
+
+
+
+
+status change :
+
+
+
+
+📢 *APPLICATION STATUS UPDATE*
+
+Hello *{applicant_name},*
+
+Your application with *{company_name}* has been updated.
+
+━━━━━━━━━━━━━━━━━━
+
+📄 *Previous Status*
+{old_status}
+
+✅ *Current Status*
+{new_status}
+
+━━━━━━━━━━━━━━━━━━
+
+📝 *Recruiter's Notes*
+
+{notes_section}
+
+━━━━━━━━━━━━━━━━━━
+
+We'll continue to keep you informed as your application progresses.
+
+If you have any questions, simply reply to this message or contact our Recruitment Team.
+
+Thank you for your interest in *{company_name}*.
+
+Best regards,
+
+*{company_name} Recruitment Team*
+
+
+
+INt schedule : 
+
+
+
+
+📅 *INTERVIEW SCHEDULED*
+
+Hello *{applicant_name},*
+
+Congratulations! You have been shortlisted for the next stage of our recruitment process.
+
+Your interview has been scheduled as follows:
+
+━━━━━━━━━━━━━━━━━━
+
+📅 *Date*
+{date}
+
+🕒 *Time*
+{time}
+
+💼 *Interview Type*
+{interview_type}
+
+👤 *Interviewer*
+{interviewer}
+
+📍 *Location / Meeting Link*
+{location}
+
+━━━━━━━━━━━━━━━━━━
+
+📝 *Additional Information*
+
+{notes_section}
+
+━━━━━━━━━━━━━━━━━━
+
+✅ Please join or arrive at least *10 minutes* before the scheduled time.
+
+If you're unable to attend, kindly let us know as soon as possible so we can arrange an alternative schedule.
+
+We look forward to meeting you.
+
+Best regards,
+
+*{company_name} Recruitment Team*

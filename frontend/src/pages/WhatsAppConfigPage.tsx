@@ -11,6 +11,12 @@ import {
   WifiOff,
   Phone,
   Plus,
+  ExternalLink,
+  KeyRound,
+  Copy,
+  Pencil,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -41,6 +47,16 @@ interface QRCodeData {
   code: string;
 }
 
+interface InstanceItem {
+  name: string;
+  instance_id: string | null;
+  apikey: string;
+  owner_jid: string | null;
+  connection_name: string;
+  created_at: string | null;
+  state: string;
+}
+
 export function WhatsAppConfigPage() {
   const [status, setStatus] = useState<WhatsAppStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +67,30 @@ export function WhatsAppConfigPage() {
   const [newInstanceName, setNewInstanceName] = useState("");
   const [newInstanceNumber, setNewInstanceNumber] = useState("");
   const [creatingInstance, setCreatingInstance] = useState(false);
+
+  const [instances, setInstances] = useState<InstanceItem[]>([]);
+  const [instancesLoading, setInstancesLoading] = useState(true);
+  const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+  const [renameTarget, setRenameTarget] = useState<InstanceItem | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [deletingName, setDeletingName] = useState<string | null>(null);
+
+  const fetchInstances = useCallback(async () => {
+    try {
+      setInstancesLoading(true);
+      const res = await api.get<{ instances: InstanceItem[] }>("/whatsapp/instances");
+      setInstances(res.data.instances ?? []);
+    } catch {
+      setInstances([]);
+    } finally {
+      setInstancesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInstances();
+  }, [fetchInstances]);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -133,10 +173,52 @@ export function WhatsAppConfigPage() {
       setNewInstanceName("");
       setNewInstanceNumber("");
       fetchStatus();
+      fetchInstances();
     } catch {
       toast({ title: "Failed to create WhatsApp instance", variant: "destructive" });
     } finally {
       setCreatingInstance(false);
+    }
+  };
+
+  const handleRenameInstance = async () => {
+    if (!renameTarget || !renameValue.trim()) return;
+    try {
+      setRenaming(true);
+      const res = await api.post(`/whatsapp/instances/${encodeURIComponent(renameTarget.name)}/rename`, {
+        new_instance_name: renameValue.trim(),
+      });
+      setRenameTarget(null);
+      setRenameValue("");
+      toast({ title: "Instance renamed", description: res.data.message, variant: "success" });
+      fetchInstances();
+    } catch {
+      toast({ title: "Failed to rename instance", variant: "destructive" });
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const handleDeleteNamedInstance = async (name: string) => {
+    if (!confirm(`Delete instance "${name}"? This will remove it from Evolution API.`)) return;
+    try {
+      setDeletingName(name);
+      const res = await api.delete(`/whatsapp/instances/${encodeURIComponent(name)}`);
+      toast({ title: "Instance deleted", description: res.data.message, variant: "success" });
+      fetchInstances();
+    } catch {
+      toast({ title: "Failed to delete instance", variant: "destructive" });
+    } finally {
+      setDeletingName(null);
+    }
+  };
+
+  const copyToClipboard = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast({ title: `${label} copied`, variant: "success" });
+    } catch {
+      toast({ title: "Copy failed", variant: "destructive" });
     }
   };
 
@@ -247,6 +329,14 @@ export function WhatsAppConfigPage() {
               <RefreshCw className="mr-1 h-3 w-3" />
               Refresh Status
             </Button>
+            {status?.api_url && (
+              <Button size="sm" variant="outline" asChild>
+                <a href={`${status.api_url.replace(/\/+$/, "")}/manager/`} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="mr-1 h-3 w-3" />
+                  Open Evolution Manager
+                </a>
+              </Button>
+            )}
             {status?.instance_connected && (
               <>
                 <Button
@@ -291,6 +381,98 @@ export function WhatsAppConfigPage() {
               </>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Instances List */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <MessageSquare className="h-4 w-4 text-primary" />
+            Instances
+          </CardTitle>
+          <Button size="sm" variant="outline" onClick={fetchInstances} disabled={instancesLoading}>
+            <RefreshCw className="mr-1 h-3 w-3" /> Refresh
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {instancesLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : instances.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              {status?.server_running
+                ? "No instances created yet. Click 'Create Instance' to add one."
+                : "Evolution API server is unreachable."}
+            </div>
+          ) : (
+            instances.map((inst) => {
+              const keyVisible = !!visibleKeys[inst.name];
+              const isConfigured = inst.name === status?.instance_name;
+              return (
+                <div key={inst.name} className="rounded-lg border border-border p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Badge className={getStateColor(inst.state)}>
+                        <Wifi className="mr-1 h-3 w-3" />
+                        {getStateLabel(inst.state)}
+                      </Badge>
+                      <span className="truncate font-medium text-sm">{inst.name}</span>
+                      {isConfigured && (
+                        <Badge variant="outline" className="text-[10px]">active</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7"
+                        onClick={() => { setRenameTarget(inst); setRenameValue(inst.name); }}
+                      >
+                        <Pencil className="h-3 w-3" /> Rename
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="h-7"
+                        disabled={deletingName === inst.name}
+                        onClick={() => handleDeleteNamedInstance(inst.name)}
+                      >
+                        {deletingName === inst.name ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {inst.owner_jid && (
+                    <p className="mt-2 text-xs text-muted-foreground">JID: <code className="font-mono">{inst.owner_jid}</code></p>
+                  )}
+
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <KeyRound className="h-3 w-3" />
+                      API Key:
+                    </span>
+                    <code className="max-w-[220px] truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                      {keyVisible || !inst.apikey
+                        ? inst.apikey || "(none)"
+                        : "•••••••••"}
+                    </code>
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setVisibleKeys((p) => ({ ...p, [inst.name]: !keyVisible }))}>
+                      {keyVisible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    </Button>
+                    {inst.apikey && (
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => copyToClipboard(inst.apikey, "API key")}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </CardContent>
       </Card>
 
@@ -418,6 +600,31 @@ export function WhatsAppConfigPage() {
                 <Plus className="mr-2 h-4 w-4" />
               )}
               Create Instance
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Instance Dialog */}
+      <Dialog open={!!renameTarget} onOpenChange={(open) => !open && setRenameTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Instance</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rename-inst">New Instance Name</Label>
+            <Input
+              id="rename-inst"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              placeholder="ats-whatsapp"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameTarget(null)}>Cancel</Button>
+            <Button onClick={handleRenameInstance} disabled={renaming || !renameValue.trim() || renameValue.trim() === renameTarget?.name}>
+              {renaming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pencil className="mr-2 h-4 w-4" />}
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
