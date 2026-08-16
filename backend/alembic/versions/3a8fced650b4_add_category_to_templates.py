@@ -19,8 +19,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('email_templates', sa.Column('category', sa.String(length=50), nullable=True, index=True))
-    op.add_column('whatsapp_templates', sa.Column('category', sa.String(length=50), nullable=True, index=True))
+    bind = op.get_bind()
+    email_columns = {column["name"] for column in sa.inspect(bind).get_columns("email_templates")}
+    whatsapp_columns = {column["name"] for column in sa.inspect(bind).get_columns("whatsapp_templates")}
+    if "category" not in email_columns:
+        op.add_column("email_templates", sa.Column("category", sa.String(length=50), nullable=True))
+    if "category" not in whatsapp_columns:
+        op.add_column("whatsapp_templates", sa.Column("category", sa.String(length=50), nullable=True))
 
 
 def downgrade() -> None:
