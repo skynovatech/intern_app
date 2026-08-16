@@ -15,7 +15,7 @@ import { STATUS_COLORS } from "@/types";
 import {
   useStatuses, useDomains, useDegrees, useYears, useDurations, useGenders, useInterviewTypes,
 } from "@/stores/lookupsStore";
-import api from "@/lib/api";
+import api, { getBackendAssetUrl } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 function fileUrl(path: string | null): string {
   if (!path) return "";
   if (path.startsWith("http")) return path;
-  return `/uploads/${path}`;
+  return getBackendAssetUrl(`uploads/${path}`);
 }
 
 interface EditForm {

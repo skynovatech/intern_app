@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Save, Loader2, Building2, UploadCloud } from "lucide-react";
 import type { AppSetting } from "@/types";
-import api from "@/lib/api";
+import api, { getBackendAssetUrl } from "@/lib/api";
 import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -168,7 +168,7 @@ export function CompanySettingsTab() {
                       {form[s.key] && (
                         <div className="flex shrink-0 items-center gap-2">
                           <img
-                            src={`/uploads/${form[s.key].replace(/^uploads\//, "")}`}
+                            src={getBackendAssetUrl(`uploads/${form[s.key].replace(/^uploads\//, "")}`)}
                             alt={s.label}
                             className="h-10 w-10 rounded border border-border bg-muted object-contain"
                           />

@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import {
   User, Lock, KeyRound, Camera, Trash2, Save, Loader2,
 } from "lucide-react";
-import api from "@/lib/api";
+import api, { getBackendAssetUrl } from "@/lib/api";
 import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +44,7 @@ export function AdminSettingsPage() {
     .slice(0, 2) ?? "AD";
 
   const avatarUrl = admin?.avatar_path
-    ? `/uploads/${admin.avatar_path}`
+    ? getBackendAssetUrl(`uploads/${admin.avatar_path}`)
     : null;
 
   const handleSaveProfile = async () => {

@@ -1,9 +1,19 @@
 import axios from "axios";
 import type { TokenResponse } from "@/types";
 
-const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  "/api";
+export const API_ORIGIN = (
+  (import.meta.env.VITE_API_URL as string | undefined) ??
+  "https://intern-app-lxil.onrender.com"
+).replace(/\/$/, "");
+
+// Backend routes are mounted under /api. Keeping this prefix here means every
+// API call in the frontend uses the same deployed backend origin.
+const API_BASE_URL = `${API_ORIGIN}/api`;
+
+export function getBackendAssetUrl(path: string) {
+  if (path.startsWith("http")) return path;
+  return `${API_ORIGIN}/${path.replace(/^\//, "")}`;
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,
