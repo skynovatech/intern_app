@@ -36,6 +36,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
 settings = get_settings()
+SORTABLE_APPLICATION_COLUMNS = {
+    "created_at", "updated_at", "full_name", "email", "mobile", "college",
+    "domain", "status", "current_year", "degree", "cgpa",
+}
 
 ALLOWED_RESUME_EXTENSIONS = {".pdf"}
 ALLOWED_PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".jfif", ".tiff", ".bmp"}
@@ -186,16 +190,29 @@ def list_applications(
     if date_to:
         query = query.filter(func.date(Application.created_at) <= date_to)
     
-    total = query.count()
-    total_pages = math.ceil(total / per_page)
-    
-    sort_column = getattr(Application, sort_by, Application.created_at)
+    if sort_by not in SORTABLE_APPLICATION_COLUMNS:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unsupported sort field: {sort_by}",
+        )
+
+    sort_column = getattr(Application, sort_by)
     if sort_order == "asc":
         query = query.order_by(sort_column.asc())
     else:
         query = query.order_by(sort_column.desc())
     
-    items = query.offset((page - 1) * per_page).limit(per_page).all()
+    try:
+        total = query.count()
+        total_pages = math.ceil(total / per_page)
+        items = query.offset((page - 1) * per_page).limit(per_page).all()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Could not read applications")
+        raise HTTPException(
+            status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The applications database schema is unavailable. Please redeploy or retry after migrations complete.",
+        ) from exc
     
     return ApplicationListResponse(
         items=items,

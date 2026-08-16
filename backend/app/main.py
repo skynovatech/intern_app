@@ -54,11 +54,20 @@ Base.metadata.create_all(bind=engine)
 
 # migrate existing tables — add columns and indexes that don't exist yet
 with engine.connect() as conn:
+    timestamp_type = (
+        "TIMESTAMP WITH TIME ZONE"
+        if engine.dialect.name == "postgresql"
+        else "DATETIME"
+    )
     for stmt in [
         "ALTER TABLE admins ADD COLUMN IF NOT EXISTS avatar_path VARCHAR(255)",
         "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
         "ALTER TABLE whatsapp_templates ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS soft_skills JSON",
+        "ALTER TABLE applications ADD COLUMN IF NOT EXISTS certifications TEXT",
         "ALTER TABLE applications ADD COLUMN IF NOT EXISTS employee_id VARCHAR(50)",
+        f"ALTER TABLE applications ADD COLUMN IF NOT EXISTS created_at {timestamp_type} DEFAULT CURRENT_TIMESTAMP",
+        f"ALTER TABLE applications ADD COLUMN IF NOT EXISTS updated_at {timestamp_type} DEFAULT CURRENT_TIMESTAMP",
         "CREATE INDEX IF NOT EXISTS ix_applications_status ON applications (status)",
         "CREATE INDEX IF NOT EXISTS ix_applications_domain ON applications (domain)",
         "CREATE INDEX IF NOT EXISTS ix_applications_created_at ON applications (created_at)",
